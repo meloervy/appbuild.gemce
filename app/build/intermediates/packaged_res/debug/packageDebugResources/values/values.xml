@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="ic_launcher_background">#121316</color>
-    <string name="app_name">Gemce</string>
-    <string name="tagline">AI study buddy that works anywhere you go</string>
-    <style name="Theme.Gemce" parent="android:Theme.Material.Light.NoActionBar"/>
-</resources>
