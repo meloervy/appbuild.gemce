@@ -12,21 +12,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,10 +40,21 @@ import com.appbuild.gemce.ai.EngineStatus
 import com.appbuild.gemce.ai.FakeEngine
 import com.appbuild.gemce.ai.LiteRtLmEngine
 import com.appbuild.gemce.ai.LlmEngine
+import com.appbuild.gemce.domain.ingest.Section
+import com.appbuild.gemce.domain.ingest.SectionChunker
 import com.appbuild.gemce.domain.model.CardJsonItem
+import com.appbuild.gemce.domain.model.KeyPointJsonItem
+import com.appbuild.gemce.domain.model.LanguageMode
+import com.appbuild.gemce.domain.model.McqJsonItem
+import com.appbuild.gemce.domain.model.ShortAnswerJsonItem
 import com.appbuild.gemce.domain.parser.JsonlParser
-import com.appbuild.gemce.domain.study.ReviewState
-import com.appbuild.gemce.domain.study.Sm2Scheduler
+import com.appbuild.gemce.domain.prompt.PromptBuilder
+import com.appbuild.gemce.ui.ingest.IngestScreen
+import com.appbuild.gemce.ui.study.AskGemceChat
+import com.appbuild.gemce.ui.study.FlashcardPlayer
+import com.appbuild.gemce.ui.study.InteractiveTestPlayer
+import com.appbuild.gemce.ui.study.McqQuizPlayer
+import com.appbuild.gemce.ui.study.ReviewerPlayer
 import com.appbuild.gemce.ui.theme.GemceTheme
 import kotlinx.coroutines.launch
 
@@ -56,252 +69,315 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GemceTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    GemceDashboard(
-                        fakeEngine = fakeEngine,
-                        liteRtLmEngine = liteRtLmEngine,
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                MainAppScaffold(
+                    fakeEngine = fakeEngine,
+                    liteRtLmEngine = liteRtLmEngine
+                )
             }
         }
     }
 }
 
 @Composable
-fun GemceDashboard(
+fun MainAppScaffold(
     fakeEngine: FakeEngine,
-    liteRtLmEngine: LiteRtLmEngine,
-    modifier: Modifier = Modifier
+    liteRtLmEngine: LiteRtLmEngine
 ) {
     val coroutineScope = rememberCoroutineScope()
+    var currentNavTab by remember { mutableIntStateOf(0) } // 0: Study Hub, 1: Import, 2: Model Setup
+
     var useRealModel by remember { mutableStateOf(false) }
     val currentEngine: LlmEngine = if (useRealModel) liteRtLmEngine else fakeEngine
-
     val engineStatus by currentEngine.status.collectAsState()
-    val isModelInstalled = remember(useRealModel) { liteRtLmEngine.isModelInstalled() }
 
-    val generatedCards = remember { mutableStateListOf<CardJsonItem>() }
-    var reviewState by remember { mutableStateOf(ReviewState(cardId = "sample_card_1")) }
-    var lastGradeGiven by remember { mutableStateOf<Int?>(null) }
+    var activeSections by remember {
+        mutableStateOf(
+            SectionChunker.chunk(
+                documentTitle = "Cell Biology & Energy",
+                rawText = """Mitochondria are membrane-bound cell organelles that generate most of the chemical energy needed to power the cell's biochemical reactions. Chemical energy produced by the mitochondria is stored in a small molecule called adenosine triphosphate (ATP).
+
+Mitochondria produce ATP through cellular respiration, converting glucose and oxygen into energy, carbon dioxide, and water. Because ATP is used by cells as universal energy currency, mitochondria are commonly referred to as the powerhouses of the cell."""
+            )
+        )
+    }
+
+    var selectedLanguage by remember { mutableStateOf(LanguageMode.TAGLISH) }
+    var selectedStudyTemplate by remember { mutableIntStateOf(0) } // 0: Flashcards, 1: Quiz, 2: Interactive Test, 3: Reviewer, 4: Ask Gemce
+
+    // Generated Study Datasets
+    val flashcards = remember { mutableStateListOf<CardJsonItem>() }
+    val mcqQuestions = remember { mutableStateListOf<McqJsonItem>() }
+    val shortQuestions = remember { mutableStateListOf<ShortAnswerJsonItem>() }
+    val keyPoints = remember { mutableStateListOf<KeyPointJsonItem>() }
     var isGenerating by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "Gemce",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "AI study buddy that works anywhere you go",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Engine Selection Chips
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterChip(
-                selected = !useRealModel,
-                onClick = {
-                    coroutineScope.launch {
-                        currentEngine.unload()
-                        useRealModel = false
-                    }
-                },
-                label = { Text("FakeEngine (Instant)") }
-            )
-            FilterChip(
-                selected = useRealModel,
-                onClick = {
-                    coroutineScope.launch {
-                        currentEngine.unload()
-                        useRealModel = true
-                    }
-                },
-                label = { Text("Gemma 4 E2B (On-Device)") }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Status Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "Engine: ${if (useRealModel) "LiteRT-LM (Gemma 4 E2B)" else "FakeEngine"}",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Status: ${
-                        when (val s = engineStatus) {
-                            is EngineStatus.Ready -> "Ready"
-                            is EngineStatus.Loading -> "Loading: ${s.message}"
-                            is EngineStatus.Unloaded -> "Unloaded"
-                            is EngineStatus.Error -> "Error: ${s.throwable.message}"
-                        }
-                    }",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                if (useRealModel) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = if (isModelInstalled) {
-                            "Model file installed at: ${liteRtLmEngine.modelFile.name}"
-                        } else {
-                            "Model not found at: files/models/${LiteRtLmEngine.MODEL_FILENAME}.\nPush via adb: adb shell run-as com.appbuild.gemce cp /data/local/tmp/gemma-4-E2B-it.litertlm files/models/"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isModelInstalled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                    )
-                }
-
-                if (engineStatus is EngineStatus.Loading || isGenerating) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Action Buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = {
-                    coroutineScope.launch {
-                        isGenerating = true
-                        if (!currentEngine.isReady) {
-                            currentEngine.initialize()
-                        }
-                        generatedCards.clear()
-                        val prompt = "Generate flashcards in JSONL format for the mitochondria section"
-                        currentEngine.generateStream(prompt).collect { line ->
-                            JsonlParser.parseCard(line)?.let { card ->
-                                generatedCards.add(card)
-                            }
-                        }
-                        isGenerating = false
-                    }
-                },
-                enabled = !isGenerating,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(if (isGenerating) "Generating..." else "Generate Cards")
+    fun generateForCurrentSection() {
+        val section = activeSections.firstOrNull() ?: return
+        coroutineScope.launch {
+            isGenerating = true
+            if (!currentEngine.isReady) {
+                currentEngine.initialize()
             }
 
-            OutlinedButton(
-                onClick = {
-                    coroutineScope.launch {
-                        currentEngine.unload()
-                        generatedCards.clear()
-                        isGenerating = false
-                    }
-                },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Reset")
+            // Generate Cards
+            flashcards.clear()
+            val cardPrompt = PromptBuilder.buildFlashcardPrompt(section.text, language = selectedLanguage)
+            currentEngine.generateStream(cardPrompt).collect { line ->
+                JsonlParser.parseCard(line)?.let { flashcards.add(it) }
+            }
+
+            // Generate MCQs
+            mcqQuestions.clear()
+            val mcqPrompt = PromptBuilder.buildMcqPrompt(section.text, language = selectedLanguage)
+            currentEngine.generateStream(mcqPrompt).collect { line ->
+                JsonlParser.parseMcq(line)?.let { mcqQuestions.add(it) }
+            }
+
+            // Generate Short-Answer items
+            shortQuestions.clear()
+            val shortPrompt = PromptBuilder.buildShortAnswerPrompt(section.text, language = selectedLanguage)
+            currentEngine.generateStream(shortPrompt).collect { line ->
+                JsonlParser.parseShortAnswer(line)?.let { shortQuestions.add(it) }
+            }
+
+            // Generate Reviewer Points
+            keyPoints.clear()
+            val pointPrompt = "Generate key points for reviewer:\n" + section.text
+            currentEngine.generateStream(pointPrompt).collect { line ->
+                JsonlParser.parseKeyPoint(line)?.let { keyPoints.add(it) }
+            }
+
+            isGenerating = false
+        }
+    }
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = currentNavTab == 0,
+                    onClick = { currentNavTab = 0 },
+                    label = { Text("Study Hub") },
+                    icon = { Text("📚") }
+                )
+                NavigationBarItem(
+                    selected = currentNavTab == 1,
+                    onClick = { currentNavTab = 1 },
+                    label = { Text("Import") },
+                    icon = { Text("📥") }
+                )
+                NavigationBarItem(
+                    selected = currentNavTab == 2,
+                    onClick = { currentNavTab = 2 },
+                    label = { Text("Model") },
+                    icon = { Text("⚙️") }
+                )
             }
         }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // SM-2 Spaced Repetition Interactive Tester
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "SM-2 Spaced Repetition (Deterministic)",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Text(
-                    text = "Repetitions: ${reviewState.repetitions} | Interval: ${reviewState.intervalDays} day(s) | Ease: ${"%.2f".format(reviewState.easeFactor)}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                if (lastGradeGiven != null) {
-                    Text(
-                        text = "Last rated: $lastGradeGiven/5",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    listOf(0 to "Blackout (0)", 3 to "Hard (3)", 5 to "Easy (5)").forEach { (grade, label) ->
-                        OutlinedButton(
-                            onClick = {
-                                lastGradeGiven = grade
-                                reviewState = Sm2Scheduler.schedule(reviewState, grade)
-                            }
+            when (currentNavTab) {
+                0 -> {
+                    // STUDY HUB
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Header with generation action
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(label, style = MaterialTheme.typography.labelSmall)
+                            Column {
+                                Text(
+                                    text = activeSections.firstOrNull()?.documentTitle ?: "Gemce Study",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Language: ${selectedLanguage.label} | ${if (useRealModel) "Gemma 4 E2B" else "FakeEngine"}",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+
+                            Button(
+                                onClick = { generateForCurrentSection() },
+                                enabled = !isGenerating && activeSections.isNotEmpty()
+                            ) {
+                                Text(if (isGenerating) "Generating..." else "Generate Study Pack")
+                            }
+                        }
+
+                        if (isGenerating) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+
+                        // Study Template Selector Tabs
+                        ScrollableTabRow(
+                            selectedTabIndex = selectedStudyTemplate,
+                            edgePadding = 16.dp
+                        ) {
+                            Tab(
+                                selected = selectedStudyTemplate == 0,
+                                onClick = { selectedStudyTemplate = 0 },
+                                text = { Text("Cards (${flashcards.size})") }
+                            )
+                            Tab(
+                                selected = selectedStudyTemplate == 1,
+                                onClick = { selectedStudyTemplate = 1 },
+                                text = { Text("MCQ Quiz (${mcqQuestions.size})") }
+                            )
+                            Tab(
+                                selected = selectedStudyTemplate == 2,
+                                onClick = { selectedStudyTemplate = 2 },
+                                text = { Text("Interactive Test (${shortQuestions.size})") }
+                            )
+                            Tab(
+                                selected = selectedStudyTemplate == 3,
+                                onClick = { selectedStudyTemplate = 3 },
+                                text = { Text("Reviewer (${keyPoints.size})") }
+                            )
+                            Tab(
+                                selected = selectedStudyTemplate == 4,
+                                onClick = { selectedStudyTemplate = 4 },
+                                text = { Text("Ask Gemce") }
+                            )
+                        }
+
+                        // Render Active Dynamic Template
+                        when (selectedStudyTemplate) {
+                            0 -> FlashcardPlayer(
+                                cards = flashcards,
+                                onFinish = { selectedStudyTemplate = 1 }
+                            )
+                            1 -> McqQuizPlayer(
+                                questions = mcqQuestions,
+                                onFinish = { _, _ -> selectedStudyTemplate = 2 }
+                            )
+                            2 -> InteractiveTestPlayer(
+                                questions = shortQuestions,
+                                engine = currentEngine,
+                                onFinish = { _, _ -> selectedStudyTemplate = 3 }
+                            )
+                            3 -> ReviewerPlayer(
+                                sectionTitle = activeSections.firstOrNull()?.title ?: "Overview",
+                                keyPoints = keyPoints
+                            )
+                            4 -> AskGemceChat(
+                                sections = activeSections,
+                                engine = currentEngine
+                            )
                         }
                     }
                 }
-            }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
+                1 -> {
+                    // IMPORT NOTES
+                    IngestScreen(
+                        onSectionsReady = { sections, language ->
+                            activeSections = sections
+                            selectedLanguage = language
+                            currentNavTab = 0
+                            generateForCurrentSection()
+                        }
+                    )
+                }
 
-        // Cards List
-        Text(
-            text = "Generated Cards (${generatedCards.size})",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(generatedCards) { card ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                2 -> {
+                    // MODEL & OFFLINE SETTINGS
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    ) {
                         Text(
-                            text = "Q: ${card.front}",
-                            style = MaterialTheme.typography.titleSmall
+                            text = "Model Settings (Offline-First)",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "A: ${card.back}",
+                            text = "Gemma 4 E2B via LiteRT-LM. No internet connection required after setup.",
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = MaterialTheme.shapes.extraSmall
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = "Evidence: ${card.evidence}",
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(4.dp)
+                            FilterChip(
+                                selected = !useRealModel,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        currentEngine.unload()
+                                        useRealModel = false
+                                    }
+                                },
+                                label = { Text("FakeEngine (Instant Testing)") }
                             )
+                            FilterChip(
+                                selected = useRealModel,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        currentEngine.unload()
+                                        useRealModel = true
+                                    }
+                                },
+                                label = { Text("Gemma 4 E2B (On-Device)") }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "Active Engine: ${if (useRealModel) "LiteRT-LM Gemma 4 E2B" else "FakeEngine"}",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = "Status: ${
+                                        when (val s = engineStatus) {
+                                            is EngineStatus.Ready -> "Ready"
+                                            is EngineStatus.Loading -> "Loading: ${s.message}"
+                                            is EngineStatus.Unloaded -> "Unloaded"
+                                            is EngineStatus.Error -> "Error: ${s.throwable.message}"
+                                        }
+                                    }",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = if (liteRtLmEngine.isModelInstalled()) {
+                                        "Model installed: ${liteRtLmEngine.modelFile.absolutePath}"
+                                    } else {
+                                        "Model file not found. To install on your phone, push the model file:\n\nadb push gemma-4-E2B-it.litertlm /data/local/tmp/\nadb shell run-as com.appbuild.gemce mkdir -p files/models\nadb shell run-as com.appbuild.gemce cp /data/local/tmp/gemma-4-E2B-it.litertlm files/models/"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (liteRtLmEngine.isModelInstalled()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    currentEngine.unload()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Unload Model (Free RAM)")
                         }
                     }
                 }
