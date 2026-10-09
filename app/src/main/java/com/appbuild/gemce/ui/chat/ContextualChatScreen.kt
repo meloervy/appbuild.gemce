@@ -48,6 +48,7 @@ import com.appbuild.gemce.ai.LlmEngine
 import com.appbuild.gemce.domain.chat.ChatMessageData
 import com.appbuild.gemce.domain.chat.ChatSessionRepository
 import com.appbuild.gemce.domain.library.DocumentRepository
+import com.appbuild.gemce.ui.markdown.MarkdownView
 import com.appbuild.gemce.domain.model.LanguageMode
 import com.appbuild.gemce.domain.profile.StudentProfile
 import com.appbuild.gemce.domain.prompt.PromptBuilder
@@ -347,8 +348,8 @@ fun ContextualChatScreen(
                                     msg.text
                                 }
 
-                                Text(
-                                    text = displayText,
+                                MarkdownView(
+                                    markdown = displayText,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )

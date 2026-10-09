@@ -79,6 +79,19 @@ class FakeEngine(
 
             prompt.contains("Ask Gemce", ignoreCase = true) || prompt.contains("STUDENT'S QUESTION:", ignoreCase = true) -> {
                 when {
+                    prompt.contains("code", ignoreCase = true) || prompt.contains("kotlin", ignoreCase = true) || prompt.contains("program", ignoreCase = true) -> {
+                        listOf(
+                            "[General Academic Knowledge - Computer Science / Programming]\n\n",
+                            "### Kotlin Coroutines & ViewModel\n\n",
+                            "Here is how you execute background tasks using `viewModelScope`:\n\n",
+                            "```kotlin\nclass StudyViewModel : ViewModel() {\n    private val _data = MutableStateFlow<List<String>>(emptyList())\n    val data: StateFlow<List<String>> = _data.asStateFlow()\n\n    fun loadData() {\n        viewModelScope.launch(Dispatchers.IO) {\n            val result = repository.fetchStudyNotes()\n            _data.value = result\n        }\n    }\n}\n```\n\n",
+                            "**Key Highlights:**\n",
+                            "- **Non-blocking Execution:** UI remains smooth and responsive at 60/120fps.\n",
+                            "- **Structured Concurrency:** Coroutines cancel automatically when ViewModel is cleared.\n\n",
+                            "> **Best Practice:** Keep long operations in `Dispatchers.IO` and update UI state on the Main dispatcher."
+                        )
+                    }
+
                     prompt.contains("system design", ignoreCase = true) || prompt.contains("architecture", ignoreCase = true) || prompt.contains("software", ignoreCase = true) -> {
                         if (isEnglish) {
                             listOf(

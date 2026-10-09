@@ -69,6 +69,7 @@ import com.appbuild.gemce.domain.library.AcademicFileType
 import com.appbuild.gemce.domain.library.DocumentItem
 import com.appbuild.gemce.domain.library.DocumentRepository
 import com.appbuild.gemce.domain.library.Folder
+import com.appbuild.gemce.ui.markdown.MarkdownView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -357,8 +358,8 @@ fun LibraryScreen(
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = doc.rawText,
+                        MarkdownView(
+                            markdown = doc.rawText,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(12.dp)
                         )

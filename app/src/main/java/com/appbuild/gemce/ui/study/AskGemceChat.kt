@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.appbuild.gemce.ai.LlmEngine
 import com.appbuild.gemce.domain.ingest.Section
 import com.appbuild.gemce.domain.prompt.PromptBuilder
+import com.appbuild.gemce.ui.markdown.MarkdownView
 import kotlinx.coroutines.launch
 
 data class ChatMessage(
@@ -117,8 +118,8 @@ fun AskGemceChat(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = msg.text,
+                            MarkdownView(
+                                markdown = msg.text,
                                 style = MaterialTheme.typography.bodyMedium
                             )
 
