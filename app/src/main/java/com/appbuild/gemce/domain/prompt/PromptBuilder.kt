@@ -150,18 +150,23 @@ $studentAnswer
         profile: StudentProfile? = null
     ): String {
         val systemInstruction = buildSystemInstruction(profile, language)
-        val formattedSections = sectionsWithLabels.joinToString("\n\n") { (label, text) ->
-            "[$label]:\n$text"
+        val formattedSections = if (sectionsWithLabels.isNotEmpty()) {
+            sectionsWithLabels.joinToString("\n\n") { (label, text) ->
+                "[$label]:\n$text"
+            }
+        } else {
+            "No specific notes currently attached."
         }
         return """
 $systemInstruction
 
-TASK: Answer the student's question based strictly on the provided notes sections.
+TASK: Act as Gemce, an expert, encouraging, offline AI study buddy and academic tutor.
 RULES:
-1. Cite source sections using markers like [S1], [S2] whenever referencing facts.
-2. If the notes do not contain the answer, state clearly: "Your notes do not cover this topic directly."
-3. If providing additional outside background, explicitly label it "[unverified]".
-4. Keep the answer clear, encouraging, structured, and calibrated to the student's level.
+1. If the student's question relates to facts inside the provided NOTES, ground your explanation in them and cite sections with markers like [S1], [S2].
+2. If the student asks about a concept NOT covered in their notes (such as System Design, Software Architecture, Computer Science, IT, Mathematics, Science, etc.), DO NOT REFUSE! Act as their tutor and teach the concept thoroughly, clearly, and step-by-step with practical examples and architecture components, calibrated to their academic level.
+3. When providing explanations outside the provided notes, clearly tag it with "[General Academic Knowledge]".
+4. Format with clean structure, bullet points, and intuitive analogies.
+5. Answer in ${language.label}.
 
 NOTES:
 $formattedSections

@@ -17,10 +17,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +33,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -107,6 +110,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScaffold(
     fakeEngine: FakeEngine,
@@ -283,6 +287,43 @@ fun MainAppScaffold(
     }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = when (currentNavTab) {
+                            0 -> "Gemce Study Hub"
+                            1 -> "Ask Gemce"
+                            2 -> "Academic Library"
+                            3 -> "Import Notes"
+                            4 -> "Settings & AI Engine"
+                            else -> "Gemce"
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                actions = {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.padding(end = 12.dp)
+                    ) {
+                        Text(
+                            text = if (useRealModel && liteRtLmEngine.isModelInstalled()) "🤖 Gemma 4 E2B" else "⚡ Demo Mode",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
@@ -323,56 +364,6 @@ fun MainAppScaffold(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Persistent Academic Context Header
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { showSetupDialog = true }
-                    ) {
-                        Text(
-                            text = "🎓 ${studentProfile.getBadgeText()} • ${selectedLanguage.label}",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "✎ Edit",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-
-                    // Language Quick Switcher
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        listOf(LanguageMode.EN, LanguageMode.FIL, LanguageMode.TAGLISH, LanguageMode.CEB).forEach { lang ->
-                            Surface(
-                                shape = MaterialTheme.shapes.extraSmall,
-                                color = if (selectedLanguage == lang) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                                modifier = Modifier.clickable { selectedLanguage = lang }
-                            ) {
-                                Text(
-                                    text = lang.code.uppercase(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (selectedLanguage == lang) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             when (currentNavTab) {
                 0 -> {
                     // Study Hub
@@ -495,6 +486,7 @@ fun MainAppScaffold(
                         },
                         studentProfile = studentProfile,
                         onEditProfileClick = { showSetupDialog = true },
+                        onLanguageSelected = { selectedLanguage = it },
                         onPickModelFileClick = { modelPickerLauncher.launch("*/*") },
                         context = context
                     )

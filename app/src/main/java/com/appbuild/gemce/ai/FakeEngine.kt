@@ -78,18 +78,73 @@ class FakeEngine(
             }
 
             prompt.contains("Ask Gemce", ignoreCase = true) || prompt.contains("STUDENT'S QUESTION:", ignoreCase = true) -> {
-                if (isEnglish) {
-                    listOf(
-                        "According to your notes [S1], the primary function of **mitochondria** is to produce ATP through *cellular respiration*.\n\n",
-                        "They are universally known as the 'powerhouses of the cell' because ATP [S1] provides the usable chemical energy required for vital metabolic activities.\n\n",
-                        "[unverified] Additional insight: Mitochondria possess their own distinct genome (mtDNA) inherited maternally."
-                    )
-                } else {
-                    listOf(
-                        "Ayon sa iyong notes [S1], ang pangunahing function ng **mitochondria** ay ang pag-produce ng ATP sa pamamagitan ng *cellular respiration*.\n\n",
-                        "Ito ang tinatawag na 'powerhouse of the cell' dahil ang ATP [S1] ang nagbibigay ng energy para sa mga metabolic activities.\n\n",
-                        "[unverified] Karagdagang info: May sariling DNA (mtDNA) ang mitochondria na namamana mula sa maternal lineage."
-                    )
+                when {
+                    prompt.contains("system design", ignoreCase = true) || prompt.contains("architecture", ignoreCase = true) || prompt.contains("software", ignoreCase = true) -> {
+                        if (isEnglish) {
+                            listOf(
+                                "[General Academic Knowledge - Computer Science / IT]\n\n",
+                                "### System Design & Architecture Overview\n\n",
+                                "System design is the process of architecting scalable, resilient, and maintainable software systems.\n\n",
+                                "**Core Pillars:**\n",
+                                "1. **Scalability:** Horizontal scaling (adding machines) vs Vertical scaling (upgrading RAM/CPU).\n",
+                                "2. **Load Balancing:** Distributing traffic across backend servers using algorithms like Round Robin or Least Connections (e.g. NGINX, AWS ALB).\n",
+                                "3. **Caching:** In-memory caching with Redis or Memcached to minimize database latency (Cache-Aside, Write-Back patterns).\n",
+                                "4. **Database Architecture:** Relational (PostgreSQL, MySQL) for ACID compliance vs NoSQL (MongoDB, Cassandra) for flexible schema and high write velocity, including read replicas and sharding.\n",
+                                "5. **Microservices vs Monolith:** Decoupling business domains into independent services communicating asynchronously via Kafka or RabbitMQ.\n\n",
+                                "**The CAP Theorem:** In any distributed data store, you can only guarantee two of Consistency, Availability, and Partition Tolerance.\n\n",
+                                "Would you like to explore a specific case study, like designing a URL Shortener, Rate Limiter, or Chat System?"
+                            )
+                        } else {
+                            listOf(
+                                "[General Academic Knowledge - Computer Science / IT]\n\n",
+                                "### System Design & Architecture Overview\n\n",
+                                "Ang System Design ay ang proseso ng pagpaplano at pagdidisenyo ng software architecture upang maging scalable, mabilis, at matatag laban sa mataas na user traffic.\n\n",
+                                "**Mahahalagang Konsepto:**\n",
+                                "1. **Scalability:** Horizontal scaling (pagdagdag ng servers) vs Vertical scaling (pagpapalaki ng specs ng server).\n",
+                                "2. **Load Balancer:** Nagbabalanse ng pasok ng trapiko sa servers upang maiwasan ang server crash.\n",
+                                "3. **Caching (Redis/Memcached):** Pag-store ng madalas gamiting data sa mabilis na memory (RAM).\n",
+                                "4. **Microservices:** Paghahati-hati ng app sa maliliit at independent na services.\n\n",
+                                "Anong partikular na paksa ang nais mong palalimin pa?"
+                            )
+                        }
+                    }
+
+                    prompt.contains("mitochondria", ignoreCase = true) || prompt.contains("cell", ignoreCase = true) -> {
+                        if (isEnglish) {
+                            listOf(
+                                "According to your notes [S1], the primary function of **mitochondria** is to produce ATP through *cellular respiration*.\n\n",
+                                "They are universally known as the 'powerhouses of the cell' because ATP [S1] provides the usable chemical energy required for vital metabolic activities.\n\n",
+                                "[unverified] Additional insight: Mitochondria possess their own distinct genome (mtDNA) inherited maternally."
+                            )
+                        } else {
+                            listOf(
+                                "Ayon sa iyong notes [S1], ang pangunahing function ng **mitochondria** ay ang pag-produce ng ATP sa pamamagitan ng *cellular respiration*.\n\n",
+                                "Ito ang tinatawag na 'powerhouse of the cell' dahil ang ATP [S1] ang nagbibigay ng energy para sa mga metabolic activities.\n\n",
+                                "[unverified] Karagdagang info: May sariling DNA (mtDNA) ang mitochondria na namamana mula sa maternal lineage."
+                            )
+                        }
+                    }
+
+                    else -> {
+                        if (isEnglish) {
+                            listOf(
+                                "[General Academic Knowledge]\n\n",
+                                "Here is an overview of this academic topic:\n\n",
+                                "• **Core Concept:** Understanding foundational principles and theoretical definitions.\n",
+                                "• **Key Application:** How to analyze and solve problems in this discipline.\n",
+                                "• **Study Strategy:** Relate these principles to real-world practical use cases.\n\n",
+                                "Ask me any specific follow-up questions to break this down further!"
+                            )
+                        } else {
+                            listOf(
+                                "[General Academic Knowledge]\n\n",
+                                "Narito ang gabay sa araling ito:\n\n",
+                                "• **Pangunahing Konsepto:** Pag-unawa sa mahahalagang kahulugan at teorya.\n",
+                                "• **Paggamit:** Paano ito maiaaplay sa pagsagot sa mga tanong sa klase.\n\n",
+                                "Sabihin mo lang kung may bahagi kang nais pang linawin!"
+                            )
+                        }
+                    }
                 }
             }
 

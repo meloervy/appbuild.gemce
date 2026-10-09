@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -119,21 +121,29 @@ fun InteractiveTestPlayer(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Question Card
-        Card(
+        ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "SHORT-ANSWER QUESTION",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+            Column(modifier = Modifier.padding(20.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = "SHORT-ANSWER QUESTION",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = currentQ.stem,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
@@ -141,13 +151,14 @@ fun InteractiveTestPlayer(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Student Answer Input Field
-        Text(text = "Your Answer:", style = MaterialTheme.typography.titleSmall)
-        Spacer(modifier = Modifier.height(4.dp))
+        Text(text = "Your Answer:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(6.dp))
         OutlinedTextField(
             value = studentAnswer,
             onValueChange = { if (gradingResult == null) studentAnswer = it },
             placeholder = { Text("Type your answer here in English, Taglish, Filipino, or Bisaya...") },
             modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
             minLines = 3,
             maxLines = 6,
             enabled = gradingResult == null && !isGrading
@@ -161,9 +172,10 @@ fun InteractiveTestPlayer(
             val finalScore = userOverrideScore ?: result.score
             val isPassed = finalScore >= 0.7f
 
-            Card(
+            ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.elevatedCardColors(
                     containerColor = if (isPassed) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
                 )
             ) {
