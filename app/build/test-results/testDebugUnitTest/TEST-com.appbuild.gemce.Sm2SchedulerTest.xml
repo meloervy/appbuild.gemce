@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.appbuild.gemce.Sm2SchedulerTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-09T12:52:11.680Z" hostname="linux-ubuntu" time="0.01">
+  <properties/>
+  <testcase name="testEaseFactorFloor" classname="com.appbuild.gemce.Sm2SchedulerTest" time="0.007"/>
+  <testcase name="testThirdReviewAppliesEaseMultiplier" classname="com.appbuild.gemce.Sm2SchedulerTest" time="0.001"/>
+  <testcase name="testSecondSuccessfulReview" classname="com.appbuild.gemce.Sm2SchedulerTest" time="0.0"/>
+  <testcase name="testLapseResetsIntervalAndRepetitions" classname="com.appbuild.gemce.Sm2SchedulerTest" time="0.0"/>
+  <testcase name="testFirstSuccessfulReview" classname="com.appbuild.gemce.Sm2SchedulerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
