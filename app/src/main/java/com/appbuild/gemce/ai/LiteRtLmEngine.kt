@@ -26,7 +26,7 @@ class LiteRtLmEngine(
 ) : LlmEngine {
 
     companion object {
-        const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
+        const val MODEL_FILENAME = ModelStorageManager.MODEL_FILENAME
     }
 
     private val _status = MutableStateFlow<EngineStatus>(EngineStatus.Unloaded)
@@ -38,13 +38,16 @@ class LiteRtLmEngine(
         get() = _status.value is EngineStatus.Ready && engine != null
 
     val modelFile: File
-        get() = File(context.filesDir, "models/$MODEL_FILENAME")
+        get() = ModelStorageManager.resolveModelFile(context)
 
-    fun isModelInstalled(): Boolean = modelFile.exists() && modelFile.length() > 0
+    fun isModelInstalled(): Boolean = ModelStorageManager.isModelInstalled(context)
+
+    fun getStorageDescription(): String = ModelStorageManager.getModelLocationDescription(context)
 
     override suspend fun initialize(): Result<Unit> = withContext(Dispatchers.IO) {
+        val resolvedFile = modelFile
         if (!isModelInstalled()) {
-            val err = IllegalStateException("Model file not found at ${modelFile.absolutePath}. Please download or push via adb.")
+            val err = IllegalStateException("Model file not found at ${resolvedFile.absolutePath}. Please download or push via adb.")
             _status.value = EngineStatus.Error(err)
             return@withContext Result.failure(err)
         }
@@ -54,7 +57,7 @@ class LiteRtLmEngine(
 
             val cacheDirectory = File(context.cacheDir, "litert_cache").apply { mkdirs() }
             val config = EngineConfig(
-                modelPath = modelFile.absolutePath,
+                modelPath = resolvedFile.absolutePath,
                 backend = preferredBackend,
                 cacheDir = cacheDirectory.absolutePath
             )

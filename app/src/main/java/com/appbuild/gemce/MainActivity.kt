@@ -1,9 +1,14 @@
 package com.appbuild.gemce
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -21,8 +27,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,8 +41,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.appbuild.gemce.ai.DownloadState
 import com.appbuild.gemce.ai.EngineStatus
@@ -43,6 +52,7 @@ import com.appbuild.gemce.ai.FakeEngine
 import com.appbuild.gemce.ai.LiteRtLmEngine
 import com.appbuild.gemce.ai.LlmEngine
 import com.appbuild.gemce.ai.ModelDownloader
+import com.appbuild.gemce.ai.ModelStorageManager
 import com.appbuild.gemce.domain.ingest.Section
 import com.appbuild.gemce.domain.library.DocumentRepository
 import com.appbuild.gemce.domain.model.CardJsonItem
@@ -51,22 +61,30 @@ import com.appbuild.gemce.domain.model.LanguageMode
 import com.appbuild.gemce.domain.model.McqJsonItem
 import com.appbuild.gemce.domain.model.ShortAnswerJsonItem
 import com.appbuild.gemce.domain.parser.JsonlParser
+import com.appbuild.gemce.domain.profile.StudentProfile
+import com.appbuild.gemce.domain.profile.UserProfileRepository
 import com.appbuild.gemce.domain.prompt.PromptBuilder
 import com.appbuild.gemce.ui.chat.ContextualChatScreen
 import com.appbuild.gemce.ui.ingest.IngestScreen
 import com.appbuild.gemce.ui.library.LibraryScreen
+import com.appbuild.gemce.ui.profile.OnboardingSetupDialog
 import com.appbuild.gemce.ui.study.FlashcardPlayer
 import com.appbuild.gemce.ui.study.InteractiveTestPlayer
 import com.appbuild.gemce.ui.study.McqQuizPlayer
 import com.appbuild.gemce.ui.study.ReviewerPlayer
 import com.appbuild.gemce.ui.theme.GemceTheme
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Initialize user profile settings
+        UserProfileRepository.initialize(applicationContext)
 
         val fakeEngine = FakeEngine()
         val liteRtLmEngine = LiteRtLmEngine(applicationContext)
@@ -91,6 +109,9 @@ fun MainAppScaffold(
     val coroutineScope = rememberCoroutineScope()
     var currentNavTab by remember { mutableIntStateOf(0) } // 0: Study Hub, 1: Chat, 2: Library, 3: Import, 4: Model Settings
 
+    val studentProfile by UserProfileRepository.studentProfile.collectAsState()
+    var showSetupDialog by remember { mutableStateOf(!studentProfile.isConfigured) }
+
     // Set Gemma 4 E2B as default, falls back to FakeEngine if model file not yet downloaded
     val isModelInstalled = remember { liteRtLmEngine.isModelInstalled() }
     var useRealModel by remember { mutableStateOf(isModelInstalled) }
@@ -107,7 +128,7 @@ fun MainAppScaffold(
         )
     }
 
-    var selectedLanguage by remember { mutableStateOf(LanguageMode.TAGLISH) }
+    var selectedLanguage by remember { mutableStateOf(studentProfile.preferredLanguage) }
     var selectedStudyTemplate by remember { mutableIntStateOf(0) } // 0: Flashcards, 1: Quiz, 2: Interactive Test, 3: Reviewer
 
     // Generated Study Datasets
@@ -127,34 +148,80 @@ fun MainAppScaffold(
 
             // Generate Cards
             flashcards.clear()
-            val cardPrompt = PromptBuilder.buildFlashcardPrompt(section.text, language = selectedLanguage)
+            val cardPrompt = PromptBuilder.buildFlashcardPrompt(
+                sectionText = section.text,
+                language = selectedLanguage,
+                profile = studentProfile
+            )
             currentEngine.generateStream(cardPrompt).collect { line ->
                 JsonlParser.parseCard(line)?.let { flashcards.add(it) }
             }
 
             // Generate MCQs
             mcqQuestions.clear()
-            val mcqPrompt = PromptBuilder.buildMcqPrompt(section.text, language = selectedLanguage)
+            val mcqPrompt = PromptBuilder.buildMcqPrompt(
+                sectionText = section.text,
+                language = selectedLanguage,
+                profile = studentProfile
+            )
             currentEngine.generateStream(mcqPrompt).collect { line ->
                 JsonlParser.parseMcq(line)?.let { mcqQuestions.add(it) }
             }
 
             // Generate Short-Answer items
             shortQuestions.clear()
-            val shortPrompt = PromptBuilder.buildShortAnswerPrompt(section.text, language = selectedLanguage)
+            val shortPrompt = PromptBuilder.buildShortAnswerPrompt(
+                sectionText = section.text,
+                language = selectedLanguage,
+                profile = studentProfile
+            )
             currentEngine.generateStream(shortPrompt).collect { line ->
                 JsonlParser.parseShortAnswer(line)?.let { shortQuestions.add(it) }
             }
 
             // Generate Reviewer Points
             keyPoints.clear()
-            val pointPrompt = "Generate key points for reviewer:\n" + section.text
+            val pointPrompt = "Generate key points for reviewer in ${selectedLanguage.label}:\n" + section.text
             currentEngine.generateStream(pointPrompt).collect { line ->
                 JsonlParser.parseKeyPoint(line)?.let { keyPoints.add(it) }
             }
 
             isGenerating = false
         }
+    }
+
+    // Model File Picker Launcher (allows user to link an existing downloaded model file)
+    val modelPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                try {
+                    val persistentTarget = ModelStorageManager.getPersistentModelFile()
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        FileOutputStream(persistentTarget).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    useRealModel = true
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    if (showSetupDialog) {
+        OnboardingSetupDialog(
+            initialProfile = studentProfile,
+            onSaveProfile = { updated ->
+                UserProfileRepository.updateProfile(updated)
+                selectedLanguage = updated.preferredLanguage
+                showSetupDialog = false
+            },
+            onDismissRequest = if (studentProfile.isConfigured) {
+                { showSetupDialog = false }
+            } else null
+        )
     }
 
     Scaffold(
@@ -198,25 +265,82 @@ fun MainAppScaffold(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // Persistent Academic Context Header
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { showSetupDialog = true }
+                    ) {
+                        Text(
+                            text = "🎓 ${studentProfile.getBadgeText()} • ${selectedLanguage.label}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "✎ Edit",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+
+                    // Language Quick Switcher
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf(LanguageMode.EN, LanguageMode.FIL, LanguageMode.TAGLISH, LanguageMode.CEB).forEach { lang ->
+                            Surface(
+                                shape = MaterialTheme.shapes.extraSmall,
+                                color = if (selectedLanguage == lang) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.clickable { selectedLanguage = lang }
+                            ) {
+                                Text(
+                                    text = lang.code.uppercase(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (selectedLanguage == lang) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             when (currentNavTab) {
                 0 -> {
-                    // STUDY HUB
+                    // Study Hub
                     Column(modifier = Modifier.fillMaxSize()) {
+                        val currentDocTitle = activeSections.firstOrNull()?.documentTitle ?: "No Document Selected"
+                        val currentSectionTitle = activeSections.firstOrNull()?.title ?: "Mitochondria & Cellular Energy"
+
+                        // Top Action Header
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = activeSections.firstOrNull()?.documentTitle ?: "Gemce Study",
+                                    text = currentSectionTitle,
                                     style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "Language: ${selectedLanguage.label} | ${if (useRealModel && liteRtLmEngine.isModelInstalled()) "Gemma 4 E2B" else "FakeEngine"}",
-                                    style = MaterialTheme.typography.labelSmall
+                                    text = "$currentDocTitle • ${if (useRealModel && liteRtLmEngine.isModelInstalled()) "Gemma 4 E2B" else "FakeEngine"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
 
@@ -228,14 +352,10 @@ fun MainAppScaffold(
                             }
                         }
 
-                        if (isGenerating) {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        }
-
-                        // Study Template Selector Tabs
-                        ScrollableTabRow(
+                        // Study Mode Tabs
+                        PrimaryScrollableTabRow(
                             selectedTabIndex = selectedStudyTemplate,
-                            edgePadding = 16.dp
+                            edgePadding = 12.dp
                         ) {
                             Tab(
                                 selected = selectedStudyTemplate == 0,
@@ -259,51 +379,44 @@ fun MainAppScaffold(
                             )
                         }
 
-                        // Render Active Dynamic Template
+                        // Study Template Content
                         when (selectedStudyTemplate) {
-                            0 -> FlashcardPlayer(
-                                cards = flashcards,
-                                onFinish = { selectedStudyTemplate = 1 }
-                            )
-                            1 -> McqQuizPlayer(
-                                questions = mcqQuestions,
-                                onFinish = { _, _ -> selectedStudyTemplate = 2 }
-                            )
-                            2 -> InteractiveTestPlayer(
-                                questions = shortQuestions,
-                                engine = currentEngine,
-                                onFinish = { _, _ -> selectedStudyTemplate = 3 }
-                            )
-                            3 -> ReviewerPlayer(
-                                sectionTitle = activeSections.firstOrNull()?.title ?: "Overview",
-                                keyPoints = keyPoints
-                            )
+                            0 -> FlashcardPlayer(cards = flashcards, onFinish = {})
+                            1 -> McqQuizPlayer(questions = mcqQuestions, onFinish = { _, _ -> })
+                            2 -> InteractiveTestPlayer(questions = shortQuestions, engine = currentEngine, onFinish = { _, _ -> })
+                            3 -> ReviewerPlayer(sectionTitle = currentSectionTitle, keyPoints = keyPoints)
                         }
                     }
                 }
 
                 1 -> {
-                    // CONTEXTUAL CHAT SCREEN (Chat with your notes)
-                    ContextualChatScreen(engine = currentEngine)
+                    // Chat Screen with dynamic student profile and language
+                    ContextualChatScreen(
+                        engine = currentEngine,
+                        language = selectedLanguage,
+                        studentProfile = studentProfile
+                    )
                 }
 
                 2 -> {
-                    // LIBRARY & FOLDER MANAGEMENT
+                    // Library Screen
                     LibraryScreen(
                         onStudyDocument = { doc ->
-                            activeSections = doc.sections
-                            currentNavTab = 0
-                            generateForCurrentSection(doc.sections)
+                            doc.sections.firstOrNull()?.let { section ->
+                                activeSections = listOf(section)
+                                currentNavTab = 0
+                                generateForCurrentSection(listOf(section))
+                            }
                         }
                     )
                 }
 
                 3 -> {
-                    // IMPORT ACADEMIC NOTES (PDF, DOCX, PPTX, MD, OCR, PASTE)
+                    // Import Screen
                     IngestScreen(
-                        onSectionsReady = { sections, language ->
+                        onSectionsReady = { sections, lang ->
                             activeSections = sections
-                            selectedLanguage = language
+                            selectedLanguage = lang
                             currentNavTab = 0
                             generateForCurrentSection(sections)
                         }
@@ -311,7 +424,7 @@ fun MainAppScaffold(
                 }
 
                 4 -> {
-                    // MODEL & DOWNLOADER SETTINGS
+                    // Model Management Screen (Persistent Storage Details)
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -319,33 +432,31 @@ fun MainAppScaffold(
                     ) {
                         Text(
                             text = "Gemma 4 E2B AI Model",
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "On-device LiteRT-LM model. Runs 100% offline without sending private notes to the cloud.",
-                            style = MaterialTheme.typography.bodyMedium
+                            text = "Offline on-device intelligence. The model file is stored in persistent shared storage so it remains intact even if Gemce is updated or uninstalled.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // In-app Downloader Card
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = "Model File: ${LiteRtLmEngine.MODEL_FILENAME} (2.41 GB)",
-                                    style = MaterialTheme.typography.titleMedium
+                                    text = "Model File: ${ModelStorageManager.MODEL_FILENAME} (2.41 GB)",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = if (liteRtLmEngine.isModelInstalled()) {
-                                        "✓ Installed on device storage (Ready for inference)"
-                                    } else {
-                                        "Not yet installed on device"
-                                    },
+                                    text = liteRtLmEngine.getStorageDescription(),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (liteRtLmEngine.isModelInstalled()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                                 )
@@ -363,8 +474,26 @@ fun MainAppScaffold(
                                                 },
                                                 modifier = Modifier.fillMaxWidth()
                                             ) {
-                                                Text("Download Gemma 4 E2B via Wi-Fi")
+                                                Text("Download Gemma 4 E2B to Persistent Storage")
                                             }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            OutlinedButton(
+                                                onClick = {
+                                                    modelPickerLauncher.launch("*/*")
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text("Locate / Link Existing Model File")
+                                            }
+                                        } else {
+                                            Text(
+                                                text = "✓ Model is ready and secured in persistent storage.",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
                                         }
                                     }
                                     is DownloadState.Downloading -> {
@@ -397,7 +526,7 @@ fun MainAppScaffold(
                                     }
                                     is DownloadState.Completed -> {
                                         Text(
-                                            text = "Download complete! Model verified.",
+                                            text = "Download complete! Stored in persistent Downloads directory.",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.primary
                                         )
@@ -474,7 +603,7 @@ fun MainAppScaffold(
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "ADB Sideload alternative (from laptop terminal):\nadb push gemma-4-E2B-it.litertlm /data/local/tmp/\nadb shell run-as com.appbuild.gemce mkdir -p files/models\nadb shell run-as com.appbuild.gemce cp /data/local/tmp/gemma-4-E2B-it.litertlm files/models/",
+                                    text = "ADB Persistent Push Command:\nadb push gemma-4-E2B-it.litertlm /sdcard/Download/Gemce/models/\n\n(Files in /sdcard/Download/ are NEVER erased when uninstalling or updating the app.)",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

@@ -36,9 +36,19 @@ object ModelDownloader {
         if (_downloadState.value is DownloadState.Downloading) return@withContext
 
         isCancelled = false
-        val modelDir = File(context.filesDir, "models").apply { mkdirs() }
-        val targetFile = File(modelDir, LiteRtLmEngine.MODEL_FILENAME)
-        val tempFile = File(modelDir, "${LiteRtLmEngine.MODEL_FILENAME}.tmp")
+
+        // Primary destination is persistent shared storage so it survives app uninstalls
+        var targetFile = ModelStorageManager.getPersistentModelFile()
+        var targetDir = targetFile.parentFile ?: ModelStorageManager.getPersistentModelDir()
+
+        if (!targetDir.exists() && !targetDir.mkdirs()) {
+            // Fallback to internal storage if shared storage cannot be created
+            targetFile = ModelStorageManager.getInternalModelFile(context)
+            targetDir = targetFile.parentFile ?: File(context.filesDir, "models")
+            targetDir.mkdirs()
+        }
+
+        val tempFile = File(targetDir, "${ModelStorageManager.MODEL_FILENAME}.tmp")
 
         try {
             var url = URL(MODEL_URL)

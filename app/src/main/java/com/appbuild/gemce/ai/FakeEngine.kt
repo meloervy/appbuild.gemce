@@ -25,52 +25,102 @@ class FakeEngine(
     }
 
     override suspend fun generateStream(prompt: String): Flow<String> = flow {
+        val isEnglish = prompt.contains("English", ignoreCase = true) || (!prompt.contains("Taglish", ignoreCase = true) && !prompt.contains("Tagalog", ignoreCase = true) && !prompt.contains("Bisaya", ignoreCase = true))
+
         val sampleOutputs = when {
             prompt.contains("grader", ignoreCase = true) || prompt.contains("evaluat", ignoreCase = true) -> {
-                // If student answer is short or empty
                 if (prompt.contains("STUDENT'S ANSWER:\n\n") || prompt.contains("I don't know", ignoreCase = true)) {
                     listOf(
                         """{"verdict":"incorrect","score":0.0,"feedback":"Answer was missing the core concept.","missing":["cellular respiration","ATP"]}"""
                     )
                 } else if (prompt.contains("ATP", ignoreCase = true) && !prompt.contains("respiration", ignoreCase = true)) {
                     listOf(
-                        """{"verdict":"partial","score":0.6,"feedback":"Magaling! You identified ATP, but you forgot to mention cellular respiration.","missing":["cellular respiration"]}"""
+                        """{"verdict":"partial","score":0.6,"feedback":"Good attempt! You identified ATP, but forgot to mention cellular respiration.","missing":["cellular respiration"]}"""
                     )
                 } else {
                     listOf(
-                        """{"verdict":"correct","score":1.0,"feedback":"Tumpak! Complete explanation touching all rubric points.","missing":[]}"""
+                        """{"verdict":"correct","score":1.0,"feedback":"Correct! Complete explanation touching all required rubric concepts.","missing":[]}"""
                     )
                 }
             }
 
-            prompt.contains("short-answer", ignoreCase = true) || prompt.contains("type\":\"short", ignoreCase = true) -> listOf(
-                """{"type":"short","stem":"Paano gumagawa ng ATP ang mitochondria sa loob ng cell?","reference_answer":"Sa pamamagitan ng cellular respiration, kung saan kino-convert ang nutrients at oxygen upang maging ATP.","rubric":["cellular respiration","nutrients and oxygen converted to ATP"],"evidence":"Mitochondria produce ATP through cellular respiration."}""",
-                """{"type":"short","stem":"Why is ATP called the cell's energy currency?","reference_answer":"Because it stores and transfers energy needed for almost all biochemical cellular activities.","rubric":["stores and transports chemical energy","fuels biochemical reactions"],"evidence":"ATP is used by cells as universal energy currency."}"""
-            )
+            prompt.contains("short-answer", ignoreCase = true) || prompt.contains("type\":\"short", ignoreCase = true) -> {
+                if (isEnglish) {
+                    listOf(
+                        """{"type":"short","stem":"How do mitochondria generate ATP inside the cell?","reference_answer":"Through cellular respiration, by converting biochemical nutrients and oxygen into ATP.","rubric":["cellular respiration","nutrients and oxygen converted to ATP"],"evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"short","stem":"Why is ATP referred to as the universal energy currency of cells?","reference_answer":"Because it directly stores and delivers chemical energy needed to power biochemical reactions.","rubric":["stores and transports chemical energy","powers biochemical reactions"],"evidence":"ATP is used by cells as universal energy currency."}"""
+                    )
+                } else {
+                    listOf(
+                        """{"type":"short","stem":"Paano gumagawa ng ATP ang mitochondria sa loob ng cell?","reference_answer":"Sa pamamagitan ng cellular respiration, kung saan kino-convert ang nutrients at oxygen upang maging ATP.","rubric":["cellular respiration","nutrients and oxygen converted to ATP"],"evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"short","stem":"Bakit tinatawag na universal energy currency ang ATP?","reference_answer":"Dahil ito ang nag-iimbak at nagbibigay ng enerhiya para sa mga biochemical reactions ng cell.","rubric":["nag-iimbak ng chemical energy","nagbibigay lakas sa mga reaksyon"],"evidence":"ATP is used by cells as universal energy currency."}"""
+                    )
+                }
+            }
 
-            prompt.contains("multiple-choice", ignoreCase = true) || prompt.contains("type\":\"mcq", ignoreCase = true) -> listOf(
-                """{"type":"mcq","stem":"Which organelle is universally referred to as the powerhouse of the cell?","choices":["Ribosome","Mitochondrion","Endoplasmic Reticulum","Golgi Complex"],"answer":1,"explanation":"Mitochondria perform cellular respiration to produce energy.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
-                """{"type":"mcq","stem":"Ano ang pangunahing enerhiya na ginagawa ng mitochondria?","choices":["Glucose","Glycogen","ATP (Adenosine Triphosphate)","Lactic Acid"],"answer":2,"explanation":"ATP ang energy currency na ginagawa ng mitochondria.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
-                """{"type":"mcq","stem":"What biological process converts nutrients into ATP?","choices":["Photosynthesis","Fermentation","Cellular Respiration","Meiosis"],"answer":2,"explanation":"Cellular respiration uses glucose and oxygen to generate ATP.","evidence":"Mitochondria produce ATP through cellular respiration."}"""
-            )
+            prompt.contains("multiple-choice", ignoreCase = true) || prompt.contains("type\":\"mcq", ignoreCase = true) -> {
+                if (isEnglish) {
+                    listOf(
+                        """{"type":"mcq","stem":"Which organelle is universally referred to as the powerhouse of the cell?","choices":["Ribosome","Mitochondrion","Endoplasmic Reticulum","Golgi Complex"],"answer":1,"explanation":"Mitochondria perform cellular respiration to produce energy.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"mcq","stem":"What is the primary energy currency generated by mitochondria?","choices":["Glucose","Glycogen","ATP (Adenosine Triphosphate)","Lactic Acid"],"answer":2,"explanation":"ATP is the chemical energy currency produced by mitochondria.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"mcq","stem":"Which biochemical pathway converts glucose into usable ATP?","choices":["Photosynthesis","Fermentation","Cellular Respiration","Meiosis"],"answer":2,"explanation":"Cellular respiration uses glucose and oxygen to generate ATP.","evidence":"Mitochondria produce ATP through cellular respiration."}"""
+                    )
+                } else {
+                    listOf(
+                        """{"type":"mcq","stem":"Which organelle is universally referred to as the powerhouse of the cell?","choices":["Ribosome","Mitochondrion","Endoplasmic Reticulum","Golgi Complex"],"answer":1,"explanation":"Mitochondria perform cellular respiration to produce energy.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"mcq","stem":"Ano ang pangunahing enerhiya na ginagawa ng mitochondria?","choices":["Glucose","Glycogen","ATP (Adenosine Triphosphate)","Lactic Acid"],"answer":2,"explanation":"ATP ang energy currency na ginagawa ng mitochondria.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"mcq","stem":"Anong proseso ang nagko-convert ng nutrients papuntang ATP?","choices":["Photosynthesis","Fermentation","Cellular Respiration","Meiosis"],"answer":2,"explanation":"Cellular respiration uses glucose and oxygen to generate ATP.","evidence":"Mitochondria produce ATP through cellular respiration."}"""
+                    )
+                }
+            }
 
-            prompt.contains("Ask Gemce", ignoreCase = true) || prompt.contains("cite", ignoreCase = true) -> listOf(
-                "Ayon sa iyong notes [S1], ang pangunahing function ng **mitochondria** ay ang pag-produce ng ATP sa pamamagitan ng *cellular respiration*.\n\n",
-                "Ito ang tinatawag na 'powerhouse of the cell' dahil ang ATP [S1] ang nagbibigay ng energy para sa mga metabolic activities.\n\n",
-                "[unverified] Karagdagang info: May sariling DNA (mtDNA) ang mitochondria na namamana mula sa maternal lineage."
-            )
+            prompt.contains("Ask Gemce", ignoreCase = true) || prompt.contains("STUDENT'S QUESTION:", ignoreCase = true) -> {
+                if (isEnglish) {
+                    listOf(
+                        "According to your notes [S1], the primary function of **mitochondria** is to produce ATP through *cellular respiration*.\n\n",
+                        "They are universally known as the 'powerhouses of the cell' because ATP [S1] provides the usable chemical energy required for vital metabolic activities.\n\n",
+                        "[unverified] Additional insight: Mitochondria possess their own distinct genome (mtDNA) inherited maternally."
+                    )
+                } else {
+                    listOf(
+                        "Ayon sa iyong notes [S1], ang pangunahing function ng **mitochondria** ay ang pag-produce ng ATP sa pamamagitan ng *cellular respiration*.\n\n",
+                        "Ito ang tinatawag na 'powerhouse of the cell' dahil ang ATP [S1] ang nagbibigay ng energy para sa mga metabolic activities.\n\n",
+                        "[unverified] Karagdagang info: May sariling DNA (mtDNA) ang mitochondria na namamana mula sa maternal lineage."
+                    )
+                }
+            }
 
-            prompt.contains("point", ignoreCase = true) || prompt.contains("reviewer", ignoreCase = true) -> listOf(
-                """{"type":"point","text":"Ang mitochondria ang responsible sa paggawa ng cellular energy (ATP).","evidence":"Mitochondria produce ATP through cellular respiration."}""",
-                """{"type":"point","text":"Cellular respiration converts nutrients into usable chemical energy.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
-                """{"type":"point","text":"Lahat ng vital biochemical processes sa katawan ay umaasa sa ATP.","evidence":"ATP is used by cells as universal energy currency."}"""
-            )
+            prompt.contains("point", ignoreCase = true) || prompt.contains("reviewer", ignoreCase = true) -> {
+                if (isEnglish) {
+                    listOf(
+                        """{"type":"point","text":"Mitochondria are membrane-bound organelles that generate most cellular chemical energy (ATP).","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"point","text":"Cellular respiration converts biochemical nutrients and oxygen into usable ATP.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"point","text":"ATP serves as the universal energy currency across all cellular activities.","evidence":"ATP is used by cells as universal energy currency."}"""
+                    )
+                } else {
+                    listOf(
+                        """{"type":"point","text":"Ang mitochondria ang responsible sa paggawa ng cellular energy (ATP).","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"point","text":"Cellular respiration converts nutrients into usable chemical energy.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"point","text":"Lahat ng vital biochemical processes sa katawan ay umaasa sa ATP.","evidence":"ATP is used by cells as universal energy currency."}"""
+                    )
+                }
+            }
 
-            else -> listOf(
-                """{"type":"card","front":"Ano ang pangunahing function ng mitochondria?","back":"Gumagawa ng ATP (energy currency) para sa cell sa pamamagitan ng cellular respiration.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
-                """{"type":"card","front":"What does ATP stand for and what is its role?","back":"Adenosine Triphosphate; it acts as the primary chemical energy currency of the cell.","evidence":"ATP is used by cells as universal energy currency."}""",
-                """{"type":"card","front":"Anong proseso ang ginagamit upang makabuo ng ATP?","back":"Cellular respiration ang proseso na nagko-convert ng nutrients at oxygen papuntang ATP.","evidence":"Mitochondria produce ATP through cellular respiration."}"""
-            )
+            else -> {
+                if (isEnglish) {
+                    listOf(
+                        """{"type":"card","front":"What is the primary function of mitochondria?","back":"Generating ATP (cellular energy currency) through cellular respiration.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"card","front":"What does ATP stand for and what is its role?","back":"Adenosine Triphosphate; it acts as the primary chemical energy currency of the cell.","evidence":"ATP is used by cells as universal energy currency."}""",
+                        """{"type":"card","front":"Which process converts biochemical nutrients into ATP?","back":"Cellular respiration converts glucose and oxygen into usable ATP.","evidence":"Mitochondria produce ATP through cellular respiration."}"""
+                    )
+                } else {
+                    listOf(
+                        """{"type":"card","front":"Ano ang pangunahing function ng mitochondria?","back":"Gumagawa ng ATP (energy currency) para sa cell sa pamamagitan ng cellular respiration.","evidence":"Mitochondria produce ATP through cellular respiration."}""",
+                        """{"type":"card","front":"What does ATP stand for and what is its role?","back":"Adenosine Triphosphate; it acts as the primary chemical energy currency of the cell.","evidence":"ATP is used by cells as universal energy currency."}""",
+                        """{"type":"card","front":"Anong proseso ang ginagamit upang makabuo ng ATP?","back":"Cellular respiration ang proseso na nagko-convert ng nutrients at oxygen papuntang ATP.","evidence":"Mitochondria produce ATP through cellular respiration."}"""
+                    )
+                }
+            }
         }
 
         for (line in sampleOutputs) {

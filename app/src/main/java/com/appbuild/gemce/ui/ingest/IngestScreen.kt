@@ -76,7 +76,7 @@ Mitochondria produce ATP through cellular respiration, converting glucose and ox
         )
     }
 
-    var selectedLanguage by remember { mutableStateOf(LanguageMode.TAGLISH) }
+    var selectedLanguage by remember { mutableStateOf(LanguageMode.EN) }
     var isProcessingFile by remember { mutableStateOf(false) }
     var extractionStatusMessage by remember { mutableStateOf<String?>(null) }
 

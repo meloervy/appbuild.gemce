@@ -18,9 +18,9 @@ enum class ItemType {
 @Serializable
 enum class LanguageMode(val code: String, val label: String) {
     EN("en", "English"),
+    FIL("fil", "Tagalog"),
     TAGLISH("taglish", "Taglish"),
-    FIL("fil", "Filipino"),
-    CEB("ceb", "Bisaya (Experimental)")
+    CEB("ceb", "Bisaya")
 }
 
 @Serializable

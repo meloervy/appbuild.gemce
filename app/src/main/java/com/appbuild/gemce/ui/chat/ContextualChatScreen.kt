@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.appbuild.gemce.ai.LlmEngine
 import com.appbuild.gemce.domain.library.DocumentRepository
+import com.appbuild.gemce.domain.model.LanguageMode
+import com.appbuild.gemce.domain.profile.StudentProfile
 import com.appbuild.gemce.domain.prompt.PromptBuilder
 import com.appbuild.gemce.ui.study.ChatMessage
 import kotlinx.coroutines.launch
@@ -40,6 +42,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ContextualChatScreen(
     engine: LlmEngine,
+    language: LanguageMode = LanguageMode.EN,
+    studentProfile: StudentProfile? = null,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -47,11 +51,18 @@ fun ContextualChatScreen(
     val activeDocs = allDocuments.filter { it.isIncludedInContext }
     val activeSections = activeDocs.flatMap { it.sections }
 
+    val welcomeGreeting = when (language) {
+        LanguageMode.EN -> "Hello! I'm Gemce, your offline AI study buddy. Your local notes are loaded (${activeDocs.size} documents, ${activeSections.size} sections). Ask me anything about your study materials!"
+        LanguageMode.FIL -> "Kumusta! Ako si Gemce, ang iyong offline AI study buddy. Naka-load ang iyong mga tala (${activeDocs.size} documents, ${activeSections.size} sections). Magtanong tungkol sa iyong aralin!"
+        LanguageMode.TAGLISH -> "Kumusta! Ako si Gemce. Naka-load ang iyong local notes (${activeDocs.size} documents, ${activeSections.size} sections). Magtanong ka lang tungkol sa mga aralin mo!"
+        LanguageMode.CEB -> "Kumusta! Ako si Gemce, ang imong offline AI study buddy. Naka-load ang imong mga notes (${activeDocs.size} documents, ${activeSections.size} sections). Pangutana bahin sa imong leksyon!"
+    }
+
     val messages = remember {
         mutableStateListOf(
             ChatMessage(
                 isUser = false,
-                text = "Kumusta! Ako si Gemce. Naka-load ang iyong local notes (${activeDocs.size} documents, ${activeSections.size} sections). Magtanong ka lang tungkol sa mga aralin mo!"
+                text = welcomeGreeting
             )
         )
     }
@@ -77,11 +88,24 @@ fun ContextualChatScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "AI Context Scope (${activeDocs.size} files active)",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "AI Context Scope (${activeDocs.size} files active)",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    studentProfile?.let {
+                        Text(
+                            text = "🎓 ${it.getBadgeText()} • ${language.label}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 if (activeDocs.isEmpty()) {
                     Text(
@@ -109,26 +133,28 @@ fun ContextualChatScreen(
                 .fillMaxWidth()
         ) {
             items(messages) { msg ->
-                val bubbleColor = if (msg.isUser)
+                val bubbleColor = if (msg.isUser) {
                     MaterialTheme.colorScheme.primaryContainer
-                else
-                    MaterialTheme.colorScheme.surfaceVariant
-
-                val alignment = if (msg.isUser) Alignment.End else Alignment.Start
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                }
+                val align = if (msg.isUser) Alignment.End else Alignment.Start
 
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = alignment
+                    horizontalAlignment = align,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = bubbleColor),
-                        modifier = Modifier.fillMaxWidth(0.85f)
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = bubbleColor,
+                        tonalElevation = 2.dp,
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
                                 text = if (msg.isUser) "You" else "Gemce AI",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
+                                color = if (msg.isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -136,8 +162,9 @@ fun ContextualChatScreen(
                                 style = MaterialTheme.typography.bodyMedium
                             )
 
-                            if (!msg.isUser && msg.text.contains("[unverified]")) {
-                                Spacer(modifier = Modifier.height(6.dp))
+                            // Unverified warning badge for outside knowledge
+                            if (!msg.isUser && msg.text.contains("[unverified]", ignoreCase = true)) {
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Surface(
                                     color = MaterialTheme.colorScheme.errorContainer,
                                     shape = MaterialTheme.shapes.extraSmall
@@ -145,7 +172,8 @@ fun ContextualChatScreen(
                                     Text(
                                         text = "Contains unverified outside knowledge",
                                         style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.padding(4.dp)
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
                             }
@@ -185,7 +213,9 @@ fun ContextualChatScreen(
 
                             val prompt = PromptBuilder.buildAskGemcePrompt(
                                 sectionsWithLabels = labeledSections,
-                                question = query
+                                question = query,
+                                language = language,
+                                profile = studentProfile
                             )
 
                             var streamedResponse = ""
