@@ -25,6 +25,9 @@ class FakeEngine(
     }
 
     override suspend fun generateStream(prompt: String): Flow<String> = flow {
+        if (!isReady) {
+            initialize()
+        }
         val isEnglish = prompt.contains("English", ignoreCase = true) || (!prompt.contains("Taglish", ignoreCase = true) && !prompt.contains("Tagalog", ignoreCase = true) && !prompt.contains("Bisaya", ignoreCase = true))
 
         val sampleOutputs = when {

@@ -16,3 +16,6 @@ local.properties
 *.hprof
 build/
 **/build/
+models_cache/
+*.litertlm
+*.bin

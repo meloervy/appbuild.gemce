@@ -40,27 +40,31 @@ object ModelStorageManager {
         val docDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
 
         return listOf(
-            // 1. Primary: Shared Public Download / Gemce / models (persists across uninstalls)
-            File(downloadDir, "Gemce/models/$MODEL_FILENAME"),
-            // 2. Direct browser download in Downloads folder
-            File(downloadDir, MODEL_FILENAME),
-            // 3. Shared Documents / Gemce / models
-            File(docDir, "Gemce/models/$MODEL_FILENAME"),
-            // 4. Internal app files directory (fallback)
+            // 1. Internal app files directory (guaranteed native open permission)
             File(context.filesDir, "models/$MODEL_FILENAME"),
-            // 5. External app files dir (if exists)
-            File(context.getExternalFilesDir(null), "models/$MODEL_FILENAME")
+            // 2. External app files dir
+            File(context.getExternalFilesDir(null), "models/$MODEL_FILENAME"),
+            // 3. Shared Public Download / Gemce / models (persists across uninstalls)
+            File(downloadDir, "Gemce/models/$MODEL_FILENAME"),
+            // 4. Direct browser download in Downloads folder
+            File(downloadDir, MODEL_FILENAME),
+            // 5. Shared Documents / Gemce / models
+            File(docDir, "Gemce/models/$MODEL_FILENAME")
         )
     }
 
     /**
-     * Finds the first existing and valid model file among all candidate locations.
+     * Finds the first existing and readable model file among all candidate locations.
      */
     fun resolveModelFile(context: Context): File {
         for (candidate in getCandidateLocations(context)) {
-            if (candidate.exists() && candidate.length() > 1024 * 1024) { // At least 1 MB
+            if (candidate.exists() && candidate.canRead() && candidate.length() > 1024 * 1024) { // At least 1 MB
                 return candidate
             }
+        }
+        val internalFallback = File(context.filesDir, "models/$MODEL_FILENAME")
+        if (internalFallback.exists() && internalFallback.length() > 1024 * 1024) {
+            return internalFallback
         }
         // If not found, return the primary persistent target where it should be downloaded/placed
         return getPersistentModelFile()
@@ -71,7 +75,7 @@ object ModelStorageManager {
      */
     fun isModelInstalled(context: Context): Boolean {
         val resolved = resolveModelFile(context)
-        return resolved.exists() && resolved.length() > 1024 * 1024
+        return resolved.exists() && resolved.canRead() && resolved.length() > 1024 * 1024
     }
 
     /**
@@ -83,9 +87,9 @@ object ModelStorageManager {
             val sizeMb = file.length() / (1024 * 1024)
             val isPersistent = file.absolutePath.contains("Download") || file.absolutePath.contains("Documents")
             if (isPersistent) {
-                "Persistent Storage (Survives uninstalls)\n${file.absolutePath} ($sizeMb MB)"
+                "Persistent Shared Storage (Survives uninstalls)\n${file.absolutePath} ($sizeMb MB)"
             } else {
-                "Internal App Storage\n${file.absolutePath} ($sizeMb MB)"
+                "App Storage (Ready & Verified)\n${file.absolutePath} ($sizeMb MB)"
             }
         } else {
             "Not installed. Will save to persistent folder:\n${getPersistentModelFile().absolutePath}"

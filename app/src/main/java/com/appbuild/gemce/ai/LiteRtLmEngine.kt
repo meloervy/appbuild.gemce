@@ -75,6 +75,13 @@ class LiteRtLmEngine(
     }
 
     override suspend fun generateStream(prompt: String): Flow<String> = flow {
+        if (!isReady) {
+            val initRes = initialize()
+            if (initRes.isFailure) {
+                emit("Error initializing Gemma 4 E2B engine: ${initRes.exceptionOrNull()?.message}")
+                return@flow
+            }
+        }
         val currentEngine = engine ?: error("Engine is not initialized")
         val conversation: Conversation = currentEngine.createConversation(
             ConversationConfig()

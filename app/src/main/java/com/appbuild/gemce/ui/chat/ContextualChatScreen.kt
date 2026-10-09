@@ -157,8 +157,22 @@ fun ContextualChatScreen(
                                 color = if (msg.isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
+                            val displayText = if (!msg.isUser) {
+                                try {
+                                    val trimmed = msg.text.trim()
+                                    if (trimmed.startsWith("{") && trimmed.contains("\"answer\"")) {
+                                        org.json.JSONObject(trimmed).optString("answer", msg.text)
+                                    } else {
+                                        msg.text
+                                    }
+                                } catch (_: Exception) {
+                                    msg.text
+                                }
+                            } else {
+                                msg.text
+                            }
                             Text(
-                                text = msg.text,
+                                text = displayText,
                                 style = MaterialTheme.typography.bodyMedium
                             )
 
@@ -222,11 +236,16 @@ fun ContextualChatScreen(
                             val botMsgIndex = messages.size
                             messages.add(ChatMessage(isUser = false, text = "..."))
 
-                            engine.generateStream(prompt).collect { chunk ->
-                                streamedResponse += chunk
-                                messages[botMsgIndex] = ChatMessage(isUser = false, text = streamedResponse)
+                            try {
+                                engine.generateStream(prompt).collect { chunk ->
+                                    streamedResponse += chunk
+                                    messages[botMsgIndex] = ChatMessage(isUser = false, text = streamedResponse)
+                                }
+                            } catch (e: Exception) {
+                                messages[botMsgIndex] = ChatMessage(isUser = false, text = "AI response notice: ${e.localizedMessage ?: e.message}")
+                            } finally {
+                                isReplying = false
                             }
-                            isReplying = false
                         }
                     }
                 },

@@ -64,10 +64,12 @@ import com.appbuild.gemce.domain.parser.JsonlParser
 import com.appbuild.gemce.domain.profile.StudentProfile
 import com.appbuild.gemce.domain.profile.UserProfileRepository
 import com.appbuild.gemce.domain.prompt.PromptBuilder
+import com.appbuild.gemce.domain.settings.AppSettingsRepository
 import com.appbuild.gemce.ui.chat.ContextualChatScreen
 import com.appbuild.gemce.ui.ingest.IngestScreen
 import com.appbuild.gemce.ui.library.LibraryScreen
 import com.appbuild.gemce.ui.profile.OnboardingSetupDialog
+import com.appbuild.gemce.ui.settings.SettingsScreen
 import com.appbuild.gemce.ui.study.FlashcardPlayer
 import com.appbuild.gemce.ui.study.InteractiveTestPlayer
 import com.appbuild.gemce.ui.study.McqQuizPlayer
@@ -83,14 +85,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Initialize user profile settings
+        // Initialize user profile & app settings
         UserProfileRepository.initialize(applicationContext)
+        AppSettingsRepository.initialize(applicationContext)
 
         val fakeEngine = FakeEngine()
         val liteRtLmEngine = LiteRtLmEngine(applicationContext)
 
         setContent {
-            GemceTheme {
+            val appSettings by AppSettingsRepository.settings.collectAsState()
+            GemceTheme(
+                themeMode = appSettings.themeMode,
+                fontPreference = appSettings.fontPreference
+            ) {
                 MainAppScaffold(
                     fakeEngine = fakeEngine,
                     liteRtLmEngine = liteRtLmEngine
@@ -112,15 +119,15 @@ fun MainAppScaffold(
     val studentProfile by UserProfileRepository.studentProfile.collectAsState()
     var showSetupDialog by remember { mutableStateOf(!studentProfile.isConfigured) }
 
-    // Set Gemma 4 E2B as default, falls back to FakeEngine if model file not yet downloaded
-    val isModelInstalled = remember { liteRtLmEngine.isModelInstalled() }
-    var useRealModel by remember { mutableStateOf(isModelInstalled) }
-    val currentEngine: LlmEngine = if (useRealModel && liteRtLmEngine.isModelInstalled()) liteRtLmEngine else fakeEngine
+    // Set Gemma 4 E2B as default when model file is present
+    val isModelInstalled = liteRtLmEngine.isModelInstalled()
+    var useRealModel by remember(isModelInstalled) { mutableStateOf(isModelInstalled) }
+    val currentEngine: LlmEngine = if (useRealModel && isModelInstalled) liteRtLmEngine else fakeEngine
     val engineStatus by currentEngine.status.collectAsState()
     val downloadState by ModelDownloader.downloadState.collectAsState()
 
     val documents by DocumentRepository.documents.collectAsState()
-    var activeSections by remember {
+    var activeSections by remember(documents) {
         mutableStateOf(
             DocumentRepository.getActiveContextSections().ifEmpty {
                 documents.firstOrNull()?.sections ?: emptyList()
@@ -142,51 +149,102 @@ fun MainAppScaffold(
         val section = targetSections.firstOrNull() ?: return
         coroutineScope.launch {
             isGenerating = true
-            if (!currentEngine.isReady) {
-                currentEngine.initialize()
-            }
+            try {
+                if (!currentEngine.isReady) {
+                    currentEngine.initialize()
+                }
 
-            // Generate Cards
-            flashcards.clear()
-            val cardPrompt = PromptBuilder.buildFlashcardPrompt(
-                sectionText = section.text,
-                language = selectedLanguage,
-                profile = studentProfile
-            )
-            currentEngine.generateStream(cardPrompt).collect { line ->
-                JsonlParser.parseCard(line)?.let { flashcards.add(it) }
-            }
+                // Generate Cards
+                flashcards.clear()
+                val cardPrompt = PromptBuilder.buildFlashcardPrompt(
+                    sectionText = section.text,
+                    language = selectedLanguage,
+                    profile = studentProfile
+                )
+                var cardBuffer = ""
+                currentEngine.generateStream(cardPrompt).collect { chunk ->
+                    cardBuffer += chunk
+                    while (cardBuffer.contains("\n")) {
+                        val newlineIdx = cardBuffer.indexOf("\n")
+                        val line = cardBuffer.substring(0, newlineIdx).trim()
+                        cardBuffer = cardBuffer.substring(newlineIdx + 1)
+                        if (line.isNotEmpty()) {
+                            JsonlParser.parseCard(line)?.let { flashcards.add(it) }
+                        }
+                    }
+                }
+                if (cardBuffer.isNotBlank()) {
+                    JsonlParser.parseCard(cardBuffer.trim())?.let { flashcards.add(it) }
+                }
 
-            // Generate MCQs
-            mcqQuestions.clear()
-            val mcqPrompt = PromptBuilder.buildMcqPrompt(
-                sectionText = section.text,
-                language = selectedLanguage,
-                profile = studentProfile
-            )
-            currentEngine.generateStream(mcqPrompt).collect { line ->
-                JsonlParser.parseMcq(line)?.let { mcqQuestions.add(it) }
-            }
+                // Generate MCQs
+                mcqQuestions.clear()
+                val mcqPrompt = PromptBuilder.buildMcqPrompt(
+                    sectionText = section.text,
+                    language = selectedLanguage,
+                    profile = studentProfile
+                )
+                var mcqBuffer = ""
+                currentEngine.generateStream(mcqPrompt).collect { chunk ->
+                    mcqBuffer += chunk
+                    while (mcqBuffer.contains("\n")) {
+                        val newlineIdx = mcqBuffer.indexOf("\n")
+                        val line = mcqBuffer.substring(0, newlineIdx).trim()
+                        mcqBuffer = mcqBuffer.substring(newlineIdx + 1)
+                        if (line.isNotEmpty()) {
+                            JsonlParser.parseMcq(line)?.let { mcqQuestions.add(it) }
+                        }
+                    }
+                }
+                if (mcqBuffer.isNotBlank()) {
+                    JsonlParser.parseMcq(mcqBuffer.trim())?.let { mcqQuestions.add(it) }
+                }
 
-            // Generate Short-Answer items
-            shortQuestions.clear()
-            val shortPrompt = PromptBuilder.buildShortAnswerPrompt(
-                sectionText = section.text,
-                language = selectedLanguage,
-                profile = studentProfile
-            )
-            currentEngine.generateStream(shortPrompt).collect { line ->
-                JsonlParser.parseShortAnswer(line)?.let { shortQuestions.add(it) }
-            }
+                // Generate Short-Answer items
+                shortQuestions.clear()
+                val shortPrompt = PromptBuilder.buildShortAnswerPrompt(
+                    sectionText = section.text,
+                    language = selectedLanguage,
+                    profile = studentProfile
+                )
+                var shortBuffer = ""
+                currentEngine.generateStream(shortPrompt).collect { chunk ->
+                    shortBuffer += chunk
+                    while (shortBuffer.contains("\n")) {
+                        val newlineIdx = shortBuffer.indexOf("\n")
+                        val line = shortBuffer.substring(0, newlineIdx).trim()
+                        shortBuffer = shortBuffer.substring(newlineIdx + 1)
+                        if (line.isNotEmpty()) {
+                            JsonlParser.parseShortAnswer(line)?.let { shortQuestions.add(it) }
+                        }
+                    }
+                }
+                if (shortBuffer.isNotBlank()) {
+                    JsonlParser.parseShortAnswer(shortBuffer.trim())?.let { shortQuestions.add(it) }
+                }
 
-            // Generate Reviewer Points
-            keyPoints.clear()
-            val pointPrompt = "Generate key points for reviewer in ${selectedLanguage.label}:\n" + section.text
-            currentEngine.generateStream(pointPrompt).collect { line ->
-                JsonlParser.parseKeyPoint(line)?.let { keyPoints.add(it) }
+                // Generate Reviewer Points
+                keyPoints.clear()
+                val pointPrompt = "Generate key points for reviewer in ${selectedLanguage.label}:\n" + section.text
+                var pointBuffer = ""
+                currentEngine.generateStream(pointPrompt).collect { chunk ->
+                    pointBuffer += chunk
+                    while (pointBuffer.contains("\n")) {
+                        val newlineIdx = pointBuffer.indexOf("\n")
+                        val line = pointBuffer.substring(0, newlineIdx).trim()
+                        pointBuffer = pointBuffer.substring(newlineIdx + 1)
+                        if (line.isNotEmpty()) {
+                            JsonlParser.parseKeyPoint(line)?.let { keyPoints.add(it) }
+                        }
+                    }
+                }
+                if (pointBuffer.isNotBlank()) {
+                    JsonlParser.parseKeyPoint(pointBuffer.trim())?.let { keyPoints.add(it) }
+                }
+            } catch (_: Exception) {
+            } finally {
+                isGenerating = false
             }
-
-            isGenerating = false
         }
     }
 
@@ -254,7 +312,7 @@ fun MainAppScaffold(
                 NavigationBarItem(
                     selected = currentNavTab == 4,
                     onClick = { currentNavTab = 4 },
-                    label = { Text("Model") },
+                    label = { Text("Settings") },
                     icon = { Text("⚙️") }
                 )
             }
@@ -424,192 +482,22 @@ fun MainAppScaffold(
                 }
 
                 4 -> {
-                    // Model Management Screen (Persistent Storage Details)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Gemma 4 E2B AI Model",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Offline on-device intelligence. The model file is stored in persistent shared storage so it remains intact even if Gemce is updated or uninstalled.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "Model File: ${ModelStorageManager.MODEL_FILENAME} (2.41 GB)",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = liteRtLmEngine.getStorageDescription(),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (liteRtLmEngine.isModelInstalled()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                when (val state = downloadState) {
-                                    is DownloadState.Idle -> {
-                                        if (!liteRtLmEngine.isModelInstalled()) {
-                                            Button(
-                                                onClick = {
-                                                    coroutineScope.launch {
-                                                        ModelDownloader.startDownload(context)
-                                                    }
-                                                },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Text("Download Gemma 4 E2B to Persistent Storage")
-                                            }
-
-                                            Spacer(modifier = Modifier.height(8.dp))
-
-                                            OutlinedButton(
-                                                onClick = {
-                                                    modelPickerLauncher.launch("*/*")
-                                                },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Text("Locate / Link Existing Model File")
-                                            }
-                                        } else {
-                                            Text(
-                                                text = "✓ Model is ready and secured in persistent storage.",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-                                    }
-                                    is DownloadState.Downloading -> {
-                                        LinearProgressIndicator(
-                                            progress = { state.progress },
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = "${(state.progress * 100).toInt()}% (${state.bytesDownloaded / (1024 * 1024)} MB / 2410 MB)",
-                                                style = MaterialTheme.typography.labelSmall
-                                            )
-                                            Text(
-                                                text = "${"%.1f".format(state.speedMbPerSec)} MB/s",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedButton(
-                                            onClick = { ModelDownloader.cancelDownload() },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text("Cancel Download")
-                                        }
-                                    }
-                                    is DownloadState.Completed -> {
-                                        Text(
-                                            text = "Download complete! Stored in persistent Downloads directory.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                    is DownloadState.Error -> {
-                                        Text(
-                                            text = "Download error: ${state.message}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.error
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Button(
-                                            onClick = {
-                                                coroutineScope.launch {
-                                                    ModelDownloader.startDownload(context)
-                                                }
-                                            }
-                                        ) {
-                                            Text("Retry Download")
-                                        }
-                                    }
-                                }
+                    // Consolidated Settings & AI Model Management Screen
+                    SettingsScreen(
+                        currentEngine = currentEngine,
+                        liteRtLmEngine = liteRtLmEngine,
+                        useRealModel = useRealModel,
+                        onToggleRealModel = { wantReal ->
+                            coroutineScope.launch {
+                                currentEngine.unload()
+                                useRealModel = wantReal
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Engine Mode Switcher
-                        Text(text = "Active AI Engine:", style = MaterialTheme.typography.titleSmall)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FilterChip(
-                                selected = useRealModel,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        currentEngine.unload()
-                                        useRealModel = true
-                                    }
-                                },
-                                label = { Text("Gemma 4 E2B (Default)") }
-                            )
-                            FilterChip(
-                                selected = !useRealModel,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        currentEngine.unload()
-                                        useRealModel = false
-                                    }
-                                },
-                                label = { Text("FakeEngine (Instant Testing)") }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = "Status: ${
-                                        when (val s = engineStatus) {
-                                            is EngineStatus.Ready -> "Ready for on-device inference"
-                                            is EngineStatus.Loading -> "Loading: ${s.message}"
-                                            is EngineStatus.Unloaded -> "Unloaded"
-                                            is EngineStatus.Error -> "Error: ${s.throwable.message}"
-                                        }
-                                    }",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "ADB Persistent Push Command:\nadb push gemma-4-E2B-it.litertlm /sdcard/Download/Gemce/models/\n\n(Files in /sdcard/Download/ are NEVER erased when uninstalling or updating the app.)",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+                        },
+                        studentProfile = studentProfile,
+                        onEditProfileClick = { showSetupDialog = true },
+                        onPickModelFileClick = { modelPickerLauncher.launch("*/*") },
+                        context = context
+                    )
                 }
             }
         }

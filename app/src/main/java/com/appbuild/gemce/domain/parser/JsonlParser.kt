@@ -22,30 +22,32 @@ object JsonlParser {
      */
     fun parseLine(line: String): Any? {
         val trimmed = line.trim()
-        if (trimmed.isEmpty() || !trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-            return null
-        }
+        if (trimmed.isEmpty()) return null
+
+        val cleaned = trimmed.removePrefix("- ").removePrefix("* ").trim()
+        val start = cleaned.indexOf("{")
+        val end = cleaned.lastIndexOf("}")
+        if (start == -1 || end == -1 || start >= end) return null
+        val jsonString = cleaned.substring(start, end + 1)
 
         return try {
-            val element = json.parseToJsonElement(trimmed).jsonObject
+            val element = json.parseToJsonElement(jsonString).jsonObject
             val type = element["type"]?.jsonPrimitive?.content
 
             when (type) {
-                "card" -> json.decodeFromString<CardJsonItem>(trimmed)
-                "mcq" -> json.decodeFromString<McqJsonItem>(trimmed)
-                "point" -> json.decodeFromString<KeyPointJsonItem>(trimmed)
-                "short" -> json.decodeFromString<ShortAnswerJsonItem>(trimmed)
+                "card" -> json.decodeFromString<CardJsonItem>(jsonString)
+                "mcq" -> json.decodeFromString<McqJsonItem>(jsonString)
+                "point" -> json.decodeFromString<KeyPointJsonItem>(jsonString)
+                "short" -> json.decodeFromString<ShortAnswerJsonItem>(jsonString)
                 else -> {
-                    // Check if it's a grading result (has "verdict" and "score")
                     if (element.containsKey("verdict") && element.containsKey("score")) {
-                        json.decodeFromString<GradingResultJson>(trimmed)
+                        json.decodeFromString<GradingResultJson>(jsonString)
                     } else {
                         null
                     }
                 }
             }
         } catch (_: Exception) {
-            // Malformed lines are skipped as per design principle 3 & generation pipeline 5.4
             null
         }
     }
@@ -61,8 +63,12 @@ object JsonlParser {
     fun parseGradingResult(line: String): GradingResultJson? {
         val trimmed = line.trim()
         if (trimmed.isEmpty()) return null
+        val start = trimmed.indexOf("{")
+        val end = trimmed.lastIndexOf("}")
+        if (start == -1 || end == -1 || start >= end) return null
+        val jsonString = trimmed.substring(start, end + 1)
         return try {
-            json.decodeFromString<GradingResultJson>(trimmed)
+            json.decodeFromString<GradingResultJson>(jsonString)
         } catch (_: Exception) {
             null
         }

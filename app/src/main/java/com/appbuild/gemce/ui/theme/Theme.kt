@@ -5,6 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import com.appbuild.gemce.domain.settings.FontPreference
+import com.appbuild.gemce.domain.settings.ThemeMode
 
 private val DarkColorScheme = darkColorScheme(
     primary = Green80,
@@ -22,14 +24,22 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun GemceTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    fontPreference: FontPreference = FontPreference.SYSTEM,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val isDark = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+    }
+
+    val colorScheme = if (isDark) DarkColorScheme else LightColorScheme
+    val typography = createAppTypography(fontPreference)
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = typography,
         content = content
     )
 }
