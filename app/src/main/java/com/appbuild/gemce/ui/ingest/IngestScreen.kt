@@ -1,6 +1,8 @@
 package com.appbuild.gemce.ui.ingest
 
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,6 +28,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,8 +42,17 @@ import androidx.compose.ui.unit.dp
 import com.appbuild.gemce.domain.ingest.OcrHelper
 import com.appbuild.gemce.domain.ingest.Section
 import com.appbuild.gemce.domain.ingest.SectionChunker
+import com.appbuild.gemce.domain.ingest.parsers.DocxExtractor
+import com.appbuild.gemce.domain.ingest.parsers.MarkdownExtractor
+import com.appbuild.gemce.domain.ingest.parsers.PdfExtractor
+import com.appbuild.gemce.domain.ingest.parsers.PptxExtractor
+import com.appbuild.gemce.domain.library.AcademicFileType
+import com.appbuild.gemce.domain.library.DocumentItem
+import com.appbuild.gemce.domain.library.DocumentRepository
 import com.appbuild.gemce.domain.model.LanguageMode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun IngestScreen(
@@ -49,9 +61,13 @@ fun IngestScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val folders by DocumentRepository.folders.collectAsState()
 
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Paste, 1: Scan Photo
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Files (PDF/DOCX/PPTX/MD), 1: Paste, 2: Photo OCR
     var documentTitle by remember { mutableStateOf("Cell Biology & Energy") }
+    var detectedFileType by remember { mutableStateOf(AcademicFileType.PASTE) }
+    var selectedFolderId by remember { mutableStateOf<String?>(null) }
+
     var rawText by remember {
         mutableStateOf(
             """Mitochondria are membrane-bound cell organelles that generate most of the chemical energy needed to power the cell's biochemical reactions. Chemical energy produced by the mitochondria is stored in a small molecule called adenosine triphosphate (ATP). 
@@ -61,38 +77,111 @@ Mitochondria produce ATP through cellular respiration, converting glucose and ox
     }
 
     var selectedLanguage by remember { mutableStateOf(LanguageMode.TAGLISH) }
-    var isOcrRunning by remember { mutableStateOf(false) }
-    var ocrStatusMessage by remember { mutableStateOf<String?>(null) }
+    var isProcessingFile by remember { mutableStateOf(false) }
+    var extractionStatusMessage by remember { mutableStateOf<String?>(null) }
 
-    // Android Photo Picker
+    fun getFileName(uri: Uri): String {
+        var name = "Academic Notes"
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex != -1 && cursor.moveToFirst()) {
+                name = cursor.getString(nameIndex)
+            }
+        }
+        return name
+    }
+
+    // Document File Picker
+    val docPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                isProcessingFile = true
+                val fileName = getFileName(uri)
+                documentTitle = fileName
+                extractionStatusMessage = "Extracting plain text from $fileName..."
+
+                withContext(Dispatchers.IO) {
+                    try {
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            val text = when {
+                                fileName.endsWith(".docx", ignoreCase = true) -> {
+                                    detectedFileType = AcademicFileType.DOCX
+                                    DocxExtractor.extractText(stream)
+                                }
+                                fileName.endsWith(".pptx", ignoreCase = true) -> {
+                                    detectedFileType = AcademicFileType.PPTX
+                                    PptxExtractor.extractText(stream)
+                                }
+                                fileName.endsWith(".pdf", ignoreCase = true) -> {
+                                    detectedFileType = AcademicFileType.PDF
+                                    PdfExtractor.extractText(context, stream)
+                                }
+                                fileName.endsWith(".md", ignoreCase = true) -> {
+                                    detectedFileType = AcademicFileType.MARKDOWN
+                                    MarkdownExtractor.extractText(stream)
+                                }
+                                else -> {
+                                    detectedFileType = AcademicFileType.TXT
+                                    stream.bufferedReader(Charsets.UTF_8).readText()
+                                }
+                            }
+
+                            withContext(Dispatchers.Main) {
+                                if (text.isNotBlank()) {
+                                    rawText = text
+                                    extractionStatusMessage = "Extracted ${text.split("\\s+".toRegex()).size} words successfully!"
+                                } else {
+                                    extractionStatusMessage = "File appears empty or could not be parsed."
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            extractionStatusMessage = "Failed to extract: ${e.message}"
+                        }
+                    } finally {
+                        withContext(Dispatchers.Main) {
+                            isProcessingFile = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Photo OCR Picker
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
             coroutineScope.launch {
                 try {
-                    isOcrRunning = true
-                    ocrStatusMessage = "Running offline ML Kit OCR..."
+                    isProcessingFile = true
+                    extractionStatusMessage = "Running offline ML Kit OCR on image..."
+                    detectedFileType = AcademicFileType.PHOTO
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         val bitmap = BitmapFactory.decodeStream(stream)
                         if (bitmap != null) {
                             val result = OcrHelper.recognizeText(bitmap)
-                            result.onSuccess { extractedText ->
-                                if (extractedText.isNotBlank()) {
-                                    rawText = extractedText
-                                    ocrStatusMessage = "Text successfully extracted from image!"
+                            result.onSuccess { extracted ->
+                                if (extracted.isNotBlank()) {
+                                    rawText = extracted
+                                    documentTitle = "Scanned Note (${System.currentTimeMillis() % 10000})"
+                                    extractionStatusMessage = "Text extracted via offline OCR!"
                                 } else {
-                                    ocrStatusMessage = "No text found in selected image."
+                                    extractionStatusMessage = "No text found in photo."
                                 }
                             }.onFailure { err ->
-                                ocrStatusMessage = "OCR error: ${err.message}"
+                                extractionStatusMessage = "OCR error: ${err.message}"
                             }
                         }
                     }
                 } catch (e: Exception) {
-                    ocrStatusMessage = "Failed to load image: ${e.message}"
+                    extractionStatusMessage = "Error opening photo: ${e.message}"
                 } finally {
-                    isOcrRunning = false
+                    isProcessingFile = false
                 }
             }
         }
@@ -109,12 +198,12 @@ Mitochondria produce ATP through cellular respiration, converting glucose and ox
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "Import Material",
+            text = "Import Academic Notes",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = "Extract notes offline from pasted text or photos",
+            text = "Supports PDF, DOCX, PPTX, Markdown, Photos & Text (100% Offline)",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -126,18 +215,138 @@ Mitochondria produce ATP through cellular respiration, converting glucose and ox
             Tab(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
-                text = { Text("Paste Text") }
+                text = { Text("Files") }
             )
             Tab(
                 selected = selectedTab == 1,
                 onClick = { selectedTab = 1 },
-                text = { Text("Scan Photo / OCR") }
+                text = { Text("Paste Text") }
+            )
+            Tab(
+                selected = selectedTab == 2,
+                onClick = { selectedTab = 2 },
+                text = { Text("Photo OCR") }
             )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Document Title
+        when (selectedTab) {
+            0 -> {
+                // Academic Files Tab
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Select Academic Document",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "PDF, Word (.docx), PowerPoint (.pptx), Markdown (.md), Text",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Button(
+                            onClick = { docPickerLauncher.launch("*/*") },
+                            enabled = !isProcessingFile
+                        ) {
+                            Text(if (isProcessingFile) "Extracting Text..." else "Browse & Open Document")
+                        }
+
+                        if (isProcessingFile) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            CircularProgressIndicator(modifier = Modifier.height(24.dp))
+                        }
+
+                        extractionStatusMessage?.let { msg ->
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(text = msg, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+
+            1 -> {
+                // Paste Text Tab
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            rawText = """Philippine History: The Philippine Revolution began in August 1896, upon the discovery of the Katipunan secret society by Spanish authorities. Led by Andres Bonifacio, members tore their cedulas during the Cry of Pugad Lawin.
+
+On June 12, 1898, Philippine Independence was proclaimed in Kawit, Cavite by General Emilio Aguinaldo, where the national flag was first unfurled and the national anthem played."""
+                            documentTitle = "Philippine History: 1896 Revolution"
+                            detectedFileType = AcademicFileType.PASTE
+                        }
+                    ) {
+                        Text("Sample Notes")
+                    }
+
+                    OutlinedButton(onClick = { rawText = "" }) {
+                        Text("Clear")
+                    }
+                }
+            }
+
+            2 -> {
+                // Photo OCR Tab
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Offline ML Kit OCR (Latin Script)",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Extract text from photos of books, blackboards, and notes.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            enabled = !isProcessingFile
+                        ) {
+                            Text("Pick Photo to OCR")
+                        }
+
+                        if (isProcessingFile) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            CircularProgressIndicator(modifier = Modifier.height(24.dp))
+                        }
+
+                        extractionStatusMessage?.let { msg ->
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(text = msg, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Document Title & Folder
         OutlinedTextField(
             value = documentTitle,
             onValueChange = { documentTitle = it },
@@ -147,85 +356,40 @@ Mitochondria produce ATP through cellular respiration, converting glucose and ox
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (selectedTab == 0) {
-            // Paste Text Tab
-            OutlinedTextField(
-                value = rawText,
-                onValueChange = { rawText = it },
-                label = { Text("Notes Content") },
-                placeholder = { Text("Paste notes here...") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
+        // Folder Assignment
+        Text(text = "Assign to Folder:", style = MaterialTheme.typography.titleSmall)
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            FilterChip(
+                selected = selectedFolderId == null,
+                onClick = { selectedFolderId = null },
+                label = { Text("No Folder") }
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        rawText = """Philippine History: The Philippine Revolution began in August 1896, upon the discovery of the Katipunan secret society by Spanish colonial authorities. Led by Andres Bonifacio, members tore their cedulas during the Cry of Pugad Lawin.
-
-The declaration of Philippine Independence occurred on June 12, 1898, in Kawit, Cavite, where General Emilio Aguinaldo proclaimed freedom and unfurled the Philippine national flag."""
-                        documentTitle = "Philippine History: 1896 Revolution"
-                    }
-                ) {
-                    Text("Load Sample Notes")
-                }
-
-                OutlinedButton(onClick = { rawText = "" }) {
-                    Text("Clear")
-                }
-            }
-        } else {
-            // Scan Photo Tab
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Bundled ML Kit Text Recognition (Latin Script)",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "100% offline OCR. Supports English, Filipino, Taglish, and Bisaya.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Button(
-                        onClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
-                        enabled = !isOcrRunning
-                    ) {
-                        Text(if (isOcrRunning) "Extracting Text..." else "Pick Photo to Scan")
-                    }
-
-                    if (isOcrRunning) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        CircularProgressIndicator(modifier = Modifier.height(24.dp))
-                    }
-
-                    ocrStatusMessage?.let { msg ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = msg, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
+            folders.forEach { f ->
+                FilterChip(
+                    selected = selectedFolderId == f.id,
+                    onClick = { selectedFolderId = f.id },
+                    label = { Text("📁 ${f.name}") }
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Raw Text Preview & Edit
+        OutlinedTextField(
+            value = rawText,
+            onValueChange = { rawText = it },
+            label = { Text("Extracted Plain Text (Editable)") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Language Mode Selector
         Text(text = "Target Study Language:", style = MaterialTheme.typography.titleSmall)
@@ -243,7 +407,7 @@ The declaration of Philippine Independence occurred on June 12, 1898, in Kawit, 
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Section Preview
         Card(
@@ -256,7 +420,7 @@ The declaration of Philippine Independence occurred on June 12, 1898, in Kawit, 
                     style = MaterialTheme.typography.titleSmall
                 )
                 parsedSections.forEachIndexed { idx, sec ->
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${idx + 1}. ${sec.title} (${sec.wordCount} words)",
                         style = MaterialTheme.typography.bodySmall
@@ -267,13 +431,26 @@ The declaration of Philippine Independence occurred on June 12, 1898, in Kawit, 
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Final Generate Button
+        // Save to Library & Study Button
         Button(
-            onClick = { onSectionsReady(parsedSections, selectedLanguage) },
+            onClick = {
+                // Save document to Library repository
+                val newDoc = DocumentItem(
+                    folderId = selectedFolderId,
+                    title = documentTitle,
+                    fileType = detectedFileType,
+                    rawText = rawText,
+                    sections = parsedSections,
+                    isIncludedInContext = true
+                )
+                DocumentRepository.addDocument(newDoc)
+
+                onSectionsReady(parsedSections, selectedLanguage)
+            },
             enabled = parsedSections.isNotEmpty(),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Proceed to Study Hub (${parsedSections.size} Sections)")
+            Text("Save to Library & Study (${parsedSections.size} Sections)")
         }
     }
 }
