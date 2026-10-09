@@ -172,8 +172,7 @@ fun MainAppScaffold(
                             0 -> "Gemce Study Hub"
                             1 -> "Ask Gemce"
                             2 -> "Academic Library"
-                            3 -> "Import Notes"
-                            4 -> "Settings & AI Engine"
+                            3 -> "Settings & AI Engine"
                             else -> "Gemce"
                         },
                         style = MaterialTheme.typography.titleLarge,
@@ -228,12 +227,6 @@ fun MainAppScaffold(
                 NavigationBarItem(
                     selected = currentNavTab == 3,
                     onClick = { currentNavTab = 3 },
-                    label = { Text("Import") },
-                    icon = { Text("📥") }
-                )
-                NavigationBarItem(
-                    selected = currentNavTab == 4,
-                    onClick = { currentNavTab = 4 },
                     label = { Text("Settings") },
                     icon = { Text("⚙️") }
                 )
@@ -292,7 +285,7 @@ fun MainAppScaffold(
                 }
 
                 2 -> {
-                    // Library Screen
+                    // Consolidated Academic Library Screen (with + Add Material flow)
                     LibraryScreen(
                         onStudyDocument = { doc ->
                             doc.sections.firstOrNull()?.let { section ->
@@ -304,17 +297,6 @@ fun MainAppScaffold(
                 }
 
                 3 -> {
-                    // Import Screen
-                    IngestScreen(
-                        onSectionsReady = { sections, lang ->
-                            activeSections = sections
-                            selectedLanguage = lang
-                            currentNavTab = 0
-                        }
-                    )
-                }
-
-                4 -> {
                     // Consolidated Settings & AI Model Management Screen
                     SettingsScreen(
                         currentEngine = currentEngine,
