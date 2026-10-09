@@ -64,17 +64,11 @@ fun IngestScreen(
     val folders by DocumentRepository.folders.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Files (PDF/DOCX/PPTX/MD), 1: Paste, 2: Photo OCR
-    var documentTitle by remember { mutableStateOf("Cell Biology & Energy") }
+    var documentTitle by remember { mutableStateOf("") }
     var detectedFileType by remember { mutableStateOf(AcademicFileType.PASTE) }
     var selectedFolderId by remember { mutableStateOf<String?>(null) }
 
-    var rawText by remember {
-        mutableStateOf(
-            """Mitochondria are membrane-bound cell organelles that generate most of the chemical energy needed to power the cell's biochemical reactions. Chemical energy produced by the mitochondria is stored in a small molecule called adenosine triphosphate (ATP). 
-
-Mitochondria produce ATP through cellular respiration, converting glucose and oxygen into energy, carbon dioxide, and water. Because ATP is used by cells as universal energy currency, mitochondria are commonly referred to as the powerhouses of the cell."""
-        )
-    }
+    var rawText by remember { mutableStateOf("") }
 
     var selectedLanguage by remember { mutableStateOf(LanguageMode.EN) }
     var isProcessingFile by remember { mutableStateOf(false) }

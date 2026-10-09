@@ -248,7 +248,7 @@ fun SettingsScreen(
                         FilterChip(
                             selected = appSettings.themeMode == mode,
                             onClick = { AppSettingsRepository.updateThemeMode(mode) },
-                            label = { Text(mode.label, fontWeight = FontWeight.SemiBold) },
+                            label = { Text("${mode.icon} ${mode.label}", fontWeight = FontWeight.SemiBold) },
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f),
                             colors = FilterChipDefaults.filterChipColors(

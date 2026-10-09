@@ -15,42 +15,7 @@ object DocumentRepository {
     private val _documents = MutableStateFlow<List<DocumentItem>>(emptyList())
     val documents: StateFlow<List<DocumentItem>> = _documents.asStateFlow()
 
-    init {
-        // Pre-populate with default folders and sample academic notes
-        val bioFolder = Folder(id = "folder_bio", name = "Cell Biology")
-        val histFolder = Folder(id = "folder_hist", name = "Philippine History")
-        _folders.value = listOf(bioFolder, histFolder)
 
-        val bioText = """Mitochondria are membrane-bound cell organelles that generate most of the chemical energy needed to power the cell's biochemical reactions. Chemical energy produced by the mitochondria is stored in a small molecule called adenosine triphosphate (ATP).
-
-Mitochondria produce ATP through cellular respiration, converting glucose and oxygen into energy, carbon dioxide, and water. Because ATP is used by cells as universal energy currency, mitochondria are commonly referred to as the powerhouses of the cell."""
-
-        val histText = """The Philippine Revolution began in August 1896, upon the discovery of the Katipunan secret society by Spanish authorities. Led by Andres Bonifacio, members tore their tax certificates (cedulas) during the Cry of Pugad Lawin.
-
-On June 12, 1898, Philippine Independence was proclaimed in Kawit, Cavite by General Emilio Aguinaldo, where the national flag was first unfurled and the national anthem played."""
-
-        val bioDoc = DocumentItem(
-            id = "doc_bio_1",
-            folderId = bioFolder.id,
-            title = "Mitochondria & Cellular Energy.docx",
-            fileType = AcademicFileType.DOCX,
-            rawText = bioText,
-            sections = SectionChunker.chunk("Mitochondria & Cellular Energy", bioText, "Page 1"),
-            isIncludedInContext = true
-        )
-
-        val histDoc = DocumentItem(
-            id = "doc_hist_1",
-            folderId = histFolder.id,
-            title = "1896 Philippine Revolution Summary.pdf",
-            fileType = AcademicFileType.PDF,
-            rawText = histText,
-            sections = SectionChunker.chunk("1896 Philippine Revolution", histText, "Page 1-2"),
-            isIncludedInContext = true
-        )
-
-        _documents.value = listOf(bioDoc, histDoc)
-    }
 
     fun addFolder(name: String): Folder {
         val folder = Folder(name = name)

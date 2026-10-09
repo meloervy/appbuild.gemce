@@ -2,17 +2,34 @@ package com.appbuild.gemce.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.appbuild.gemce.R
 import com.appbuild.gemce.domain.settings.FontPreference
+
+val CalibriFontFamily = FontFamily(
+    Font(R.font.calibri_regular, FontWeight.Normal),
+    Font(R.font.calibri_bold, FontWeight.Bold)
+)
+
+val SerifFontFamily = FontFamily(
+    Font(R.font.serif_regular, FontWeight.Normal),
+    Font(R.font.serif_bold, FontWeight.Bold)
+)
+
+val MonospaceFontFamily = FontFamily(
+    Font(R.font.monospace_regular, FontWeight.Normal),
+    Font(R.font.monospace_bold, FontWeight.Bold)
+)
 
 fun getFontFamily(preference: FontPreference): FontFamily {
     return when (preference) {
         FontPreference.SYSTEM -> FontFamily.Default
-        FontPreference.SANS_SERIF -> FontFamily.SansSerif
-        FontPreference.SERIF -> FontFamily.Serif
-        FontPreference.MONOSPACE -> FontFamily.Monospace
+        FontPreference.CALIBRI -> CalibriFontFamily
+        FontPreference.SERIF -> SerifFontFamily
+        FontPreference.MONOSPACE -> MonospaceFontFamily
     }
 }
 

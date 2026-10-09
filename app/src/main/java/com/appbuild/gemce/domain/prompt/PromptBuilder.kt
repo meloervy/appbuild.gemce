@@ -147,7 +147,8 @@ $studentAnswer
         sectionsWithLabels: List<Pair<String, String>>, // Pair("S1", "section text...")
         question: String,
         language: LanguageMode = LanguageMode.EN,
-        profile: StudentProfile? = null
+        profile: StudentProfile? = null,
+        history: List<Pair<String, String>> = emptyList()
     ): String {
         val systemInstruction = buildSystemInstruction(profile, language)
         val formattedSections = if (sectionsWithLabels.isNotEmpty()) {
@@ -157,6 +158,12 @@ $studentAnswer
         } else {
             "No specific notes currently attached."
         }
+        val formattedHistory = if (history.isNotEmpty()) {
+            "PRIOR CONVERSATION CONTEXT:\n" + history.takeLast(6).joinToString("\n") { (role, content) ->
+                "$role: $content"
+            } + "\n\n"
+        } else ""
+
         return """
 $systemInstruction
 
@@ -171,7 +178,7 @@ RULES:
 NOTES:
 $formattedSections
 
-STUDENT'S QUESTION:
+$formattedHistory STUDENT'S CURRENT QUESTION:
 $question
 """.trimIndent()
     }

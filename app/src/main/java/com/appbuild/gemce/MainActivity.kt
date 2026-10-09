@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,21 +18,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -56,27 +51,19 @@ import com.appbuild.gemce.ai.LiteRtLmEngine
 import com.appbuild.gemce.ai.LlmEngine
 import com.appbuild.gemce.ai.ModelDownloader
 import com.appbuild.gemce.ai.ModelStorageManager
+import com.appbuild.gemce.domain.chat.ChatSessionRepository
 import com.appbuild.gemce.domain.ingest.Section
 import com.appbuild.gemce.domain.library.DocumentRepository
-import com.appbuild.gemce.domain.model.CardJsonItem
-import com.appbuild.gemce.domain.model.KeyPointJsonItem
 import com.appbuild.gemce.domain.model.LanguageMode
-import com.appbuild.gemce.domain.model.McqJsonItem
-import com.appbuild.gemce.domain.model.ShortAnswerJsonItem
-import com.appbuild.gemce.domain.parser.JsonlParser
 import com.appbuild.gemce.domain.profile.StudentProfile
 import com.appbuild.gemce.domain.profile.UserProfileRepository
-import com.appbuild.gemce.domain.prompt.PromptBuilder
 import com.appbuild.gemce.domain.settings.AppSettingsRepository
 import com.appbuild.gemce.ui.chat.ContextualChatScreen
 import com.appbuild.gemce.ui.ingest.IngestScreen
 import com.appbuild.gemce.ui.library.LibraryScreen
 import com.appbuild.gemce.ui.profile.OnboardingSetupDialog
 import com.appbuild.gemce.ui.settings.SettingsScreen
-import com.appbuild.gemce.ui.study.FlashcardPlayer
-import com.appbuild.gemce.ui.study.InteractiveTestPlayer
-import com.appbuild.gemce.ui.study.McqQuizPlayer
-import com.appbuild.gemce.ui.study.ReviewerPlayer
+import com.appbuild.gemce.ui.study.AdaptiveStudyHubScreen
 import com.appbuild.gemce.ui.theme.GemceTheme
 import kotlinx.coroutines.launch
 import java.io.File
@@ -91,6 +78,7 @@ class MainActivity : ComponentActivity() {
         // Initialize user profile & app settings
         UserProfileRepository.initialize(applicationContext)
         AppSettingsRepository.initialize(applicationContext)
+        ChatSessionRepository.initialize(applicationContext)
 
         val fakeEngine = FakeEngine()
         val liteRtLmEngine = LiteRtLmEngine(applicationContext)
@@ -140,117 +128,6 @@ fun MainAppScaffold(
     }
 
     var selectedLanguage by remember { mutableStateOf(studentProfile.preferredLanguage) }
-    var selectedStudyTemplate by remember { mutableIntStateOf(0) } // 0: Flashcards, 1: Quiz, 2: Interactive Test, 3: Reviewer
-
-    // Generated Study Datasets
-    val flashcards = remember { mutableStateListOf<CardJsonItem>() }
-    val mcqQuestions = remember { mutableStateListOf<McqJsonItem>() }
-    val shortQuestions = remember { mutableStateListOf<ShortAnswerJsonItem>() }
-    val keyPoints = remember { mutableStateListOf<KeyPointJsonItem>() }
-    var isGenerating by remember { mutableStateOf(false) }
-
-    fun generateForCurrentSection(targetSections: List<Section> = activeSections) {
-        val section = targetSections.firstOrNull() ?: return
-        coroutineScope.launch {
-            isGenerating = true
-            try {
-                if (!currentEngine.isReady) {
-                    currentEngine.initialize()
-                }
-
-                // Generate Cards
-                flashcards.clear()
-                val cardPrompt = PromptBuilder.buildFlashcardPrompt(
-                    sectionText = section.text,
-                    language = selectedLanguage,
-                    profile = studentProfile
-                )
-                var cardBuffer = ""
-                currentEngine.generateStream(cardPrompt).collect { chunk ->
-                    cardBuffer += chunk
-                    while (cardBuffer.contains("\n")) {
-                        val newlineIdx = cardBuffer.indexOf("\n")
-                        val line = cardBuffer.substring(0, newlineIdx).trim()
-                        cardBuffer = cardBuffer.substring(newlineIdx + 1)
-                        if (line.isNotEmpty()) {
-                            JsonlParser.parseCard(line)?.let { flashcards.add(it) }
-                        }
-                    }
-                }
-                if (cardBuffer.isNotBlank()) {
-                    JsonlParser.parseCard(cardBuffer.trim())?.let { flashcards.add(it) }
-                }
-
-                // Generate MCQs
-                mcqQuestions.clear()
-                val mcqPrompt = PromptBuilder.buildMcqPrompt(
-                    sectionText = section.text,
-                    language = selectedLanguage,
-                    profile = studentProfile
-                )
-                var mcqBuffer = ""
-                currentEngine.generateStream(mcqPrompt).collect { chunk ->
-                    mcqBuffer += chunk
-                    while (mcqBuffer.contains("\n")) {
-                        val newlineIdx = mcqBuffer.indexOf("\n")
-                        val line = mcqBuffer.substring(0, newlineIdx).trim()
-                        mcqBuffer = mcqBuffer.substring(newlineIdx + 1)
-                        if (line.isNotEmpty()) {
-                            JsonlParser.parseMcq(line)?.let { mcqQuestions.add(it) }
-                        }
-                    }
-                }
-                if (mcqBuffer.isNotBlank()) {
-                    JsonlParser.parseMcq(mcqBuffer.trim())?.let { mcqQuestions.add(it) }
-                }
-
-                // Generate Short-Answer items
-                shortQuestions.clear()
-                val shortPrompt = PromptBuilder.buildShortAnswerPrompt(
-                    sectionText = section.text,
-                    language = selectedLanguage,
-                    profile = studentProfile
-                )
-                var shortBuffer = ""
-                currentEngine.generateStream(shortPrompt).collect { chunk ->
-                    shortBuffer += chunk
-                    while (shortBuffer.contains("\n")) {
-                        val newlineIdx = shortBuffer.indexOf("\n")
-                        val line = shortBuffer.substring(0, newlineIdx).trim()
-                        shortBuffer = shortBuffer.substring(newlineIdx + 1)
-                        if (line.isNotEmpty()) {
-                            JsonlParser.parseShortAnswer(line)?.let { shortQuestions.add(it) }
-                        }
-                    }
-                }
-                if (shortBuffer.isNotBlank()) {
-                    JsonlParser.parseShortAnswer(shortBuffer.trim())?.let { shortQuestions.add(it) }
-                }
-
-                // Generate Reviewer Points
-                keyPoints.clear()
-                val pointPrompt = "Generate key points for reviewer in ${selectedLanguage.label}:\n" + section.text
-                var pointBuffer = ""
-                currentEngine.generateStream(pointPrompt).collect { chunk ->
-                    pointBuffer += chunk
-                    while (pointBuffer.contains("\n")) {
-                        val newlineIdx = pointBuffer.indexOf("\n")
-                        val line = pointBuffer.substring(0, newlineIdx).trim()
-                        pointBuffer = pointBuffer.substring(newlineIdx + 1)
-                        if (line.isNotEmpty()) {
-                            JsonlParser.parseKeyPoint(line)?.let { keyPoints.add(it) }
-                        }
-                    }
-                }
-                if (pointBuffer.isNotBlank()) {
-                    JsonlParser.parseKeyPoint(pointBuffer.trim())?.let { keyPoints.add(it) }
-                }
-            } catch (_: Exception) {
-            } finally {
-                isGenerating = false
-            }
-        }
-    }
 
     // Model File Picker Launcher (allows user to link an existing downloaded model file)
     val modelPickerLauncher = rememberLauncherForActivityResult(
@@ -306,14 +183,18 @@ fun MainAppScaffold(
                 actions = {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = if (engineStatus is EngineStatus.Loading) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.padding(end = 12.dp)
                     ) {
                         Text(
-                            text = if (useRealModel && liteRtLmEngine.isModelInstalled()) "🤖 Gemma 4 E2B" else "⚡ Demo Mode",
+                            text = when {
+                                engineStatus is EngineStatus.Loading -> "⏳ Initializing..."
+                                useRealModel && liteRtLmEngine.isModelInstalled() -> "🤖 Gemma 4 E2B"
+                                else -> "⚡ Demo Mode"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = if (engineStatus is EngineStatus.Loading) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                         )
                     }
@@ -364,78 +245,41 @@ fun MainAppScaffold(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // Persistent Engine Loading Indicator
+            AnimatedVisibility(visible = engineStatus is EngineStatus.Loading) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            text = "Gemma 4 E2B is initializing weights into memory... Please wait",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
+
             when (currentNavTab) {
                 0 -> {
-                    // Study Hub
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        val currentDocTitle = activeSections.firstOrNull()?.documentTitle ?: "No Document Selected"
-                        val currentSectionTitle = activeSections.firstOrNull()?.title ?: "Mitochondria & Cellular Energy"
-
-                        // Top Action Header
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = currentSectionTitle,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = "$currentDocTitle • ${if (useRealModel && liteRtLmEngine.isModelInstalled()) "Gemma 4 E2B" else "FakeEngine"}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            Button(
-                                onClick = { generateForCurrentSection() },
-                                enabled = !isGenerating && activeSections.isNotEmpty()
-                            ) {
-                                Text(if (isGenerating) "Generating..." else "Generate Study Pack")
-                            }
-                        }
-
-                        // Study Mode Tabs
-                        PrimaryScrollableTabRow(
-                            selectedTabIndex = selectedStudyTemplate,
-                            edgePadding = 12.dp
-                        ) {
-                            Tab(
-                                selected = selectedStudyTemplate == 0,
-                                onClick = { selectedStudyTemplate = 0 },
-                                text = { Text("Cards (${flashcards.size})") }
-                            )
-                            Tab(
-                                selected = selectedStudyTemplate == 1,
-                                onClick = { selectedStudyTemplate = 1 },
-                                text = { Text("MCQ Quiz (${mcqQuestions.size})") }
-                            )
-                            Tab(
-                                selected = selectedStudyTemplate == 2,
-                                onClick = { selectedStudyTemplate = 2 },
-                                text = { Text("Interactive Test (${shortQuestions.size})") }
-                            )
-                            Tab(
-                                selected = selectedStudyTemplate == 3,
-                                onClick = { selectedStudyTemplate = 3 },
-                                text = { Text("Reviewer (${keyPoints.size})") }
-                            )
-                        }
-
-                        // Study Template Content
-                        when (selectedStudyTemplate) {
-                            0 -> FlashcardPlayer(cards = flashcards, onFinish = {})
-                            1 -> McqQuizPlayer(questions = mcqQuestions, onFinish = { _, _ -> })
-                            2 -> InteractiveTestPlayer(questions = shortQuestions, engine = currentEngine, onFinish = { _, _ -> })
-                            3 -> ReviewerPlayer(sectionTitle = currentSectionTitle, keyPoints = keyPoints)
-                        }
-                    }
+                    // Adaptive AI Study Hub & Advisor
+                    AdaptiveStudyHubScreen(
+                        currentEngine = currentEngine,
+                        activeSections = activeSections,
+                        studentProfile = studentProfile,
+                        selectedLanguage = selectedLanguage
+                    )
                 }
 
                 1 -> {
@@ -454,7 +298,6 @@ fun MainAppScaffold(
                             doc.sections.firstOrNull()?.let { section ->
                                 activeSections = listOf(section)
                                 currentNavTab = 0
-                                generateForCurrentSection(listOf(section))
                             }
                         }
                     )
@@ -467,7 +310,6 @@ fun MainAppScaffold(
                             activeSections = sections
                             selectedLanguage = lang
                             currentNavTab = 0
-                            generateForCurrentSection(sections)
                         }
                     )
                 }

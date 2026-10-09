@@ -30,7 +30,7 @@ object AppSettingsRepository {
 
         val fontName = sp.getString(KEY_FONT_PREFERENCE, FontPreference.SYSTEM.name) ?: FontPreference.SYSTEM.name
         val fontPref = try {
-            FontPreference.valueOf(fontName)
+            if (fontName == "SANS_SERIF") FontPreference.CALIBRI else FontPreference.valueOf(fontName)
         } catch (_: Exception) {
             FontPreference.SYSTEM
         }
