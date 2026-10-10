@@ -16,6 +16,11 @@ Download the ready-to-install Android APK directly from GitHub:
 - 🚀 **[Download Latest Gemce APK](https://github.com/meloervy/appbuild.gemce/releases)**
 - Every commit to `main` also automatically generates a fresh installable APK under GitHub **[Actions Artifacts](https://github.com/meloervy/appbuild.gemce/actions)**.
 
+### 🎬 Live Demo & Pitch Video (Portrait 3:4)
+Watch the on-device feature walkthrough and live pitch (1m 51s · 1080×1440 Portrait 3:4 · Edge-TTS voiceover & studio soundtrack):
+- 📹 **[Watch Gemce Demo Video (MP4)](docs/demo/gemce_pitch_demo_3x4.mp4)**
+- Highlights: Cold app start & logo animation, Gemma 4 E2B engine setup, Adaptive Study Hub with Earth & Life Science, SuperMemo SM-2 flashcard recall, structured reviewers, and 24/7 offline academic tutoring chat.
+
 ---
 
 ## 📖 Overview
