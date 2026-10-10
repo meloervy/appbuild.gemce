@@ -11,6 +11,7 @@ object AppSettingsRepository {
     private const val PREFS_NAME = "gemce_app_settings_prefs"
     private const val KEY_THEME_MODE = "theme_mode"
     private const val KEY_FONT_PREFERENCE = "font_preference"
+    private const val KEY_PROCESS_ONLY_WHILE_CHARGING = "process_only_while_charging"
 
     private var prefs: SharedPreferences? = null
 
@@ -35,9 +36,12 @@ object AppSettingsRepository {
             FontPreference.SYSTEM
         }
 
+        val chargingOnly = sp.getBoolean(KEY_PROCESS_ONLY_WHILE_CHARGING, false)
+
         _settings.value = AppSettings(
             themeMode = themeMode,
-            fontPreference = fontPref
+            fontPreference = fontPref,
+            processOnlyWhileCharging = chargingOnly
         )
     }
 
@@ -49,5 +53,10 @@ object AppSettingsRepository {
     fun updateFontPreference(fontPref: FontPreference) {
         _settings.value = _settings.value.copy(fontPreference = fontPref)
         prefs?.edit()?.putString(KEY_FONT_PREFERENCE, fontPref.name)?.apply()
+    }
+
+    fun updateProcessOnlyWhileCharging(enabled: Boolean) {
+        _settings.value = _settings.value.copy(processOnlyWhileCharging = enabled)
+        prefs?.edit()?.putBoolean(KEY_PROCESS_ONLY_WHILE_CHARGING, enabled)?.apply()
     }
 }

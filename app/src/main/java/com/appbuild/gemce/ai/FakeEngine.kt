@@ -161,6 +161,24 @@ class FakeEngine(
                 }
             }
 
+            prompt.contains("CONCEPT TO EXPLAIN:", ignoreCase = true) || prompt.contains("Explain this specific academic concept", ignoreCase = true) -> {
+                if (isEnglish) {
+                    listOf(
+                        "### 💡 Conceptual Breakdown\n\n",
+                        "**Core Definition:** This concept represents a cornerstone mechanism in this field of study. It describes the orderly interaction and transformation of components to produce the observed phenomenon.\n\n",
+                        "> **Real-World Analogy:** Think of this system like a municipal electric power grid or high-speed transit network—every unit coordinates to deliver energy exactly where demand surges.\n\n",
+                        "**Exam & Study Tip:** When answering exam questions, always explicitly define the inputs, the operational mechanism, and the resulting outcome. Linking these 3 steps guarantees full marks."
+                    )
+                } else {
+                    listOf(
+                        "### 💡 Paliwanag sa Konsepto\n\n",
+                        "**Pangunahing Kahulugan:** Ang konseptong ito ay mahalagang pundasyon sa araling ito. Ipinapaliwanag nito ang proseso at ugnayan ng mga elemento upang maganap ang naturang mekanismo.\n\n",
+                        "> **Halimbawa sa Totoong Buhay:** Isipin mo ito tulad ng isang rechargeable battery o power station sa lungsod na nag-iipon at nagbabahagi ng kuryente sa mga bahay.\n\n",
+                        "**Pang-Review Tip:** Sa pagsusulit, laging banggitin ang simula ng proseso, ang mismong mekanismo, at ang pinal na resulta para sa kumpletong puntos."
+                    )
+                }
+            }
+
             prompt.contains("point", ignoreCase = true) || prompt.contains("reviewer", ignoreCase = true) -> {
                 if (isEnglish) {
                     listOf(

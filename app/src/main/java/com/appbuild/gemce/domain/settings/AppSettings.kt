@@ -17,5 +17,6 @@ enum class FontPreference(val label: String, val description: String) {
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val fontPreference: FontPreference = FontPreference.SYSTEM
+    val fontPreference: FontPreference = FontPreference.SYSTEM,
+    val processOnlyWhileCharging: Boolean = false
 )

@@ -417,6 +417,22 @@ fun AdaptiveStudyHubScreen(
                     ) {
                         Text("🚀 Generate & Begin Study Session", fontWeight = FontWeight.Bold)
                     }
+
+                    if (selectedGoal == StudyGoal.MEMORY) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                flashcards.clear()
+                                studySessionActive = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text("➕ Create Deck Manually (Zero AI)", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
         }
@@ -485,10 +501,23 @@ fun AdaptiveStudyHubScreen(
                 }
             } else {
                 when (selectedGoal.recommendedMethodIndex) {
-                    0 -> FlashcardPlayer(cards = flashcards, onFinish = { studySessionActive = false })
+                    0 -> FlashcardPlayer(
+                        cards = flashcards,
+                        onFinish = { studySessionActive = false },
+                        engine = currentEngine,
+                        language = selectedLanguage,
+                        studentProfile = studentProfile,
+                        onAddCard = { flashcards.add(it) }
+                    )
                     1 -> McqQuizPlayer(questions = mcqQuestions, onFinish = { _, _ -> studySessionActive = false })
                     2 -> InteractiveTestPlayer(questions = shortQuestions, engine = currentEngine, onFinish = { _, _ -> studySessionActive = false })
-                    3 -> ReviewerPlayer(sectionTitle = activeTopicName, keyPoints = keyPoints)
+                    3 -> ReviewerPlayer(
+                        sectionTitle = activeTopicName,
+                        keyPoints = keyPoints,
+                        engine = currentEngine,
+                        language = selectedLanguage,
+                        studentProfile = studentProfile
+                    )
                 }
             }
         }

@@ -47,6 +47,15 @@ import com.appbuild.gemce.ai.ModelStorageManager
 import com.appbuild.gemce.domain.model.LanguageMode
 import com.appbuild.gemce.domain.profile.StudentProfile
 import com.appbuild.gemce.domain.profile.UserProfileRepository
+import android.widget.Toast
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.appbuild.gemce.domain.chat.ChatSessionRepository
+import com.appbuild.gemce.domain.library.DocumentRepository
 import com.appbuild.gemce.domain.settings.AppSettingsRepository
 import com.appbuild.gemce.domain.settings.FontPreference
 import com.appbuild.gemce.domain.settings.ThemeMode
@@ -71,6 +80,11 @@ fun SettingsScreen(
     val appSettings by AppSettingsRepository.settings.collectAsState()
     val engineStatus by currentEngine.status.collectAsState()
     val downloadState by ModelDownloader.downloadState.collectAsState()
+
+    val documents by DocumentRepository.documents.collectAsState()
+    val folders by DocumentRepository.folders.collectAsState()
+    val chatSessions by ChatSessionRepository.sessions.collectAsState()
+    var showClearDataDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -491,10 +505,99 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Battery & Power optimization: "Process only while charging" (M13)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "⚡ Process Only While Charging",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Restrict heavy model generation & test grading to when device is plugged in to conserve battery.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = appSettings.processOnlyWhileCharging,
+                        onCheckedChange = { AppSettingsRepository.updateProcessOnlyWhileCharging(it) }
+                    )
+                }
             }
         }
 
-        // Section 6: Privacy & Offline Notice
+        // Section 6: Storage Usage & Data Management (M13)
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Text(
+                    text = "💾 Storage Usage & Data",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Local offline storage breakdown across notes and AI weights:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val modelFile = ModelStorageManager.resolveModelFile(context)
+                        val modelSizeMb = if (modelFile.exists()) modelFile.length() / (1024 * 1024) else 0L
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Academic Documents & Notes:", style = MaterialTheme.typography.bodySmall)
+                            Text("${documents.size} file(s)", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Document Folders:", style = MaterialTheme.typography.bodySmall)
+                            Text("${folders.size} folder(s)", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Chat History Sessions:", style = MaterialTheme.typography.bodySmall)
+                            Text("${chatSessions.size} session(s)", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Gemma 4 E2B Weight Storage:", style = MaterialTheme.typography.bodySmall)
+                            Text("$modelSizeMb MB", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedButton(
+                    onClick = { showClearDataDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("🗑️ Clear All Application Data", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        // Section 7: Privacy & Offline Guarantee
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -521,6 +624,37 @@ fun SettingsScreen(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+    }
+
+    // Confirmation Dialog: Clear All Data
+    if (showClearDataDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDataDialog = false },
+            title = { Text("Clear All Study Data?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "This will permanently delete all imported documents, created folders, and chat histories from local storage. Your downloaded model file will be kept safe."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        DocumentRepository.clearAll()
+                        ChatSessionRepository.clearAll()
+                        showClearDataDialog = false
+                        Toast.makeText(context, "All study data cleared. Fresh start initialized.", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Clear Everything")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDataDialog = false }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }

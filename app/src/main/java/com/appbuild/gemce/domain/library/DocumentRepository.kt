@@ -54,4 +54,9 @@ object DocumentRepository {
     fun getActiveContextSections(): List<Section> {
         return _documents.value.filter { it.isIncludedInContext }.flatMap { it.sections }
     }
+
+    fun clearAll() {
+        _folders.value = emptyList()
+        _documents.value = emptyList()
+    }
 }

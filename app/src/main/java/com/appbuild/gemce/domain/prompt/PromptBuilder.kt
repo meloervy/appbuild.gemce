@@ -182,4 +182,28 @@ $formattedHistory STUDENT'S CURRENT QUESTION:
 $question
 """.trimIndent()
     }
+
+    fun buildExplainThisPrompt(
+        conceptOrText: String,
+        evidence: String = "",
+        language: LanguageMode = LanguageMode.EN,
+        profile: StudentProfile? = null
+    ): String {
+        val systemInstruction = buildSystemInstruction(profile, language)
+        val evidenceClause = if (evidence.isNotBlank()) "GROUNDING CONTEXT FROM STUDENT NOTES:\n\"$evidence\"\n\n" else ""
+        return """
+$systemInstruction
+
+TASK: Explain this specific academic concept or question clearly and intuitively.
+RULES:
+1. Explain in 2-3 structured paragraphs suited for ${profile?.getFullAcademicContext() ?: "college level"}.
+2. Include an intuitive real-world analogy to make the concept memorable.
+3. Highlight a high-yield takeaway or practical tip for exam recall.
+4. If notes contain grounding evidence, reference it faithfully.
+5. Answer in ${language.label}.
+
+${evidenceClause}CONCEPT TO EXPLAIN:
+$conceptOrText
+""".trimIndent()
+    }
 }

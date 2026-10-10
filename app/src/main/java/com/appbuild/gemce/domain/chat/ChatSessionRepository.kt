@@ -122,4 +122,14 @@ object ChatSessionRepository {
         } catch (_: Exception) {
         }
     }
+
+    fun clearAll() {
+        _sessions.value = emptyList()
+        _activeSessionId.value = null
+        try {
+            storageFile?.delete()
+        } catch (_: Exception) {
+        }
+        createNewSession()
+    }
 }
