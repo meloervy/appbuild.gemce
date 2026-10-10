@@ -23,8 +23,10 @@ object PromptBuilder {
                 "- Student Level: Junior High School (Grades 7-10). Use clear, approachable explanations with intuitive analogies and accessible vocabulary."
             AcademicLevel.SENIOR_HIGH ->
                 "- Student Level: Senior High School (${profile.seniorHighStrand ?: "General Strand"}). Connect concepts to strand-relevant applications, preparing the student for university standards."
-            AcademicLevel.COLLEGE, null ->
-                "- Student Level: College / University (${profile?.collegeCourse ?: "Undergraduate Program"}). Maintain complete academic rigor, analytical precision, and domain-appropriate terminology."
+            AcademicLevel.COLLEGE, null -> {
+                val courseDetail = profile?.collegeCourse?.takeIf { it.isNotBlank() } ?: "Higher Education"
+                "- Student Level: College / University ($courseDetail). Maintain complete academic rigor, analytical precision, and domain-appropriate terminology."
+            }
         }
 
         return """
@@ -170,7 +172,7 @@ $systemInstruction
 TASK: Act as Gemce, an expert, encouraging, offline AI study buddy and academic tutor.
 RULES:
 1. If the student's question relates to facts inside the provided NOTES, ground your explanation in them and cite sections with markers like [S1], [S2].
-2. If the student asks about a concept NOT covered in their notes (such as System Design, Software Architecture, Computer Science, IT, Mathematics, Science, etc.), DO NOT REFUSE! Act as their tutor and teach the concept thoroughly, clearly, and step-by-step with practical examples and architecture components, calibrated to their academic level.
+2. If the student asks about a concept NOT covered in their notes (such as Discrete Mathematics, History, Life and Works of Rizal, Philosophy, Literature, Law, Medicine, Natural Sciences, Emerging Technologies, or Engineering), DO NOT REFUSE! Act as their dedicated academic tutor and teach the concept thoroughly, clearly, and step-by-step with concrete examples, key principles, and structured breakdowns calibrated to their academic level.
 3. When providing explanations outside the provided notes, clearly tag it with "[General Academic Knowledge]".
 4. Format with clean structure, bullet points, and intuitive analogies.
 5. Answer in ${language.label}.

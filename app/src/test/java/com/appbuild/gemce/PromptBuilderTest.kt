@@ -67,4 +67,24 @@ class PromptBuilderTest {
         assertTrue(instruction.contains("JSON Lines"))
         assertTrue(instruction.contains("Ground EVERYTHING"))
     }
+
+    @Test
+    fun testDefaultCollegeProfileIsNeutral() {
+        val defaultProfile = StudentProfile()
+        val instruction = PromptBuilder.buildSystemInstruction(defaultProfile, LanguageMode.EN)
+        assertTrue(instruction.contains("Higher Education"))
+        org.junit.Assert.assertFalse(instruction.contains("BS Computer Science"))
+    }
+
+    @Test
+    fun testAskGemcePromptIsUniversalAcrossDisciplines() {
+        val prompt = PromptBuilder.buildAskGemcePrompt(
+            sectionsWithLabels = emptyList(),
+            question = "Explain Noli Me Tangere's social impact",
+            language = LanguageMode.EN
+        )
+        assertTrue(prompt.contains("Life and Works of Rizal"))
+        assertTrue(prompt.contains("Discrete Mathematics"))
+        assertTrue(prompt.contains("Emerging Technologies"))
+    }
 }

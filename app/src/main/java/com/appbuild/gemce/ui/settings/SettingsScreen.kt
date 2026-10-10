@@ -149,7 +149,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Study subjects like STEM, System Design, Computer Science, and Healthcare will be taught with level-appropriate rigor.",
+                            text = "Subjects across all disciplines—including Humanities, Sciences, Mathematics, History, and Engineering—will be taught with level-appropriate rigor.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -357,7 +357,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "System design is the process of architecting scalable modules and services. Mitochondria generate cellular energy (ATP) through cellular respiration.",
+                            text = "Gemce is an offline AI study buddy. Master any subject: Discrete Math, Life & Works of Rizal, Emerging Technologies, and imported notes.",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = getFontFamily(appSettings.fontPreference)
                             ),

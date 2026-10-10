@@ -43,7 +43,7 @@ object AcademicOptions {
 data class StudentProfile(
     val academicLevel: AcademicLevel = AcademicLevel.COLLEGE,
     val seniorHighStrand: String? = null,
-    val collegeCourse: String? = "BS Computer Science / IT / IS",
+    val collegeCourse: String? = null,
     val preferredLanguage: LanguageMode = LanguageMode.EN,
     val isConfigured: Boolean = false
 ) {
@@ -51,7 +51,7 @@ data class StudentProfile(
         return when (academicLevel) {
             AcademicLevel.JUNIOR_HIGH -> "Junior High School (Grades 7-10)"
             AcademicLevel.SENIOR_HIGH -> "Senior High School — ${seniorHighStrand ?: "General Strand"}"
-            AcademicLevel.COLLEGE -> "College / University — ${collegeCourse ?: "Undergraduate Program"}"
+            AcademicLevel.COLLEGE -> "College / University${if (collegeCourse.isNullOrBlank()) "" else " — $collegeCourse"}"
         }
     }
 
@@ -59,7 +59,7 @@ data class StudentProfile(
         return when (academicLevel) {
             AcademicLevel.JUNIOR_HIGH -> "High School"
             AcademicLevel.SENIOR_HIGH -> seniorHighStrand?.substringBefore(" ") ?: "Senior High"
-            AcademicLevel.COLLEGE -> collegeCourse?.substringBefore(" /") ?: "College"
+            AcademicLevel.COLLEGE -> if (collegeCourse.isNullOrBlank()) "College" else collegeCourse.substringBefore(" /")
         }
     }
 }

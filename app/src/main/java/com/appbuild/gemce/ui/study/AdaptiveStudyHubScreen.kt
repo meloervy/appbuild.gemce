@@ -94,7 +94,18 @@ fun AdaptiveStudyHubScreen(
 
     fun generateAndStart(goal: StudyGoal) {
         val topic = customTopicInput.ifBlank { activeSections.firstOrNull()?.title ?: "General Study Topic" }
-        val sectionContent = activeSections.firstOrNull()?.text ?: "Comprehensive academic topic: $topic. Calibrated for ${studentProfile.getFullAcademicContext()}."
+        val matchingSection = activeSections.firstOrNull {
+            it.title.contains(topic, ignoreCase = true) || topic.contains(it.title, ignoreCase = true)
+        }
+        val sectionContent = if (matchingSection != null) {
+            matchingSection.text
+        } else if (customTopicInput.isNotBlank()) {
+            "Comprehensive academic subject: $topic.\nCore principles, concepts, historical or technical background, definitions, and practical applications of $topic."
+        } else if (activeSections.isNotEmpty()) {
+            activeSections.first().text
+        } else {
+            "Comprehensive academic subject: $topic.\nCore principles, concepts, definitions, and foundational knowledge of $topic."
+        }
 
         coroutineScope.launch {
             isGenerating = true
@@ -255,7 +266,7 @@ fun AdaptiveStudyHubScreen(
                     OutlinedTextField(
                         value = customTopicInput,
                         onValueChange = { customTopicInput = it },
-                        placeholder = { Text("e.g. System Design, Organic Chemistry, Calculus, Data Structures...") },
+                        placeholder = { Text("e.g. Discrete Math, Life & Works of Rizal, Emerging Tech, Biology...") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         singleLine = true
@@ -278,7 +289,14 @@ fun AdaptiveStudyHubScreen(
                         val topicPills = if (activeSections.isNotEmpty()) {
                             activeSections.map { it.title }
                         } else {
-                            listOf("System Design & Architecture", "Database Sharding & Caching", "Data Structures & Algorithms", "Microservices Architecture")
+                            listOf(
+                                "Discrete Mathematics",
+                                "Life & Works of Rizal",
+                                "Emerging Technologies",
+                                "World History & Civilizations",
+                                "General Biology & Ecology",
+                                "Ethics & Moral Philosophy"
+                            )
                         }
                         topicPills.forEach { pill ->
                             SuggestionChip(

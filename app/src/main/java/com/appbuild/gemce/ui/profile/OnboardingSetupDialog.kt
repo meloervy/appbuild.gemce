@@ -47,7 +47,7 @@ fun OnboardingSetupDialog(
 ) {
     var selectedLevel by remember { mutableStateOf(initialProfile.academicLevel) }
     var selectedStrand by remember { mutableStateOf(initialProfile.seniorHighStrand ?: AcademicOptions.seniorHighStrands.first()) }
-    var collegeCourseText by remember { mutableStateOf(initialProfile.collegeCourse ?: "BS Computer Science / IT / IS") }
+    var collegeCourseText by remember { mutableStateOf(initialProfile.collegeCourse ?: "") }
     var selectedLanguage by remember { mutableStateOf(initialProfile.preferredLanguage) }
 
     Dialog(onDismissRequest = { onDismissRequest?.invoke() }) {
@@ -156,7 +156,8 @@ fun OnboardingSetupDialog(
                         OutlinedTextField(
                             value = collegeCourseText,
                             onValueChange = { collegeCourseText = it },
-                            label = { Text("Your Degree / Major") },
+                            label = { Text("Your Degree / Major (Optional)") },
+                            placeholder = { Text("e.g. Accountancy, Nursing, Education, History, CS...") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -171,8 +172,8 @@ fun OnboardingSetupDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                         ) {
-                            AcademicOptions.commonCollegeCourses.take(6).forEach { course ->
-                                val chipLabel = course.substringBefore(" /").take(14)
+                            AcademicOptions.commonCollegeCourses.take(8).forEach { course ->
+                                val chipLabel = course.substringBefore(" /").take(15)
                                 FilterChip(
                                     selected = collegeCourseText == course,
                                     onClick = { collegeCourseText = course },

@@ -128,10 +128,10 @@ fun ContextualChatScreen(
     }
 
     val welcomeGreeting = when (language) {
-        LanguageMode.EN -> "Hello! I'm Gemce, your offline AI study buddy. Ask me anything about your loaded notes, or any academic topic like System Design, Computer Science, Math, or Science!"
-        LanguageMode.FIL -> "Kumusta! Ako si Gemce, ang iyong offline AI study buddy. Magtanong tungkol sa iyong notes o anumang aralin tulad ng System Design, IT, Math, o Science!"
-        LanguageMode.TAGLISH -> "Kumusta! Ako si Gemce. Pwede kang magtanong tungkol sa notes mo, or kahit anong academic subjects like System Design, Programming, Math, or Science!"
-        LanguageMode.CEB -> "Kumusta! Ako si Gemce, ang imong offline AI study buddy. Pangutana bahin sa imong notes o bisan unsang academic subject sama sa System Design, IT, Math, o Science!"
+        LanguageMode.EN -> "Hello! I'm Gemce, your offline AI study buddy. Ask me anything about your loaded notes, or any academic subject (Discrete Math, Life & Works of Rizal, Emerging Tech, Literature, Sciences, and more)!"
+        LanguageMode.FIL -> "Kumusta! Ako si Gemce, ang iyong offline AI study buddy. Magtanong tungkol sa iyong notes o anumang aralin tulad ng Discrete Math, Buhay at mga Akda ni Rizal, Emerging Tech, Kasaysayan, o Agham!"
+        LanguageMode.TAGLISH -> "Kumusta! Ako si Gemce. Pwede kang magtanong tungkol sa notes mo, or kahit anong academic subjects like Discrete Math, Rizal, Emerging Tech, Science, or History!"
+        LanguageMode.CEB -> "Kumusta! Ako si Gemce, ang imong offline AI study buddy. Pangutana bahin sa imong notes o bisan unsang academic subject sama sa Math, Rizal, Emerging Tech, o Kasaysayan!"
     }
 
     Column(
@@ -149,11 +149,9 @@ fun ContextualChatScreen(
         ) {
             // New Chat Button
             Surface(
+                onClick = { ChatSessionRepository.createNewSession() },
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable {
-                    ChatSessionRepository.createNewSession()
-                }
+                color = MaterialTheme.colorScheme.primary
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -172,24 +170,29 @@ fun ContextualChatScreen(
                     selected = isSelected,
                     onClick = { ChatSessionRepository.selectSession(s.id) },
                     label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = s.title.take(18) + if (s.title.length > 18) "..." else "",
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                            if (sessions.size > 1 && isSelected) {
-                                Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = s.title.take(18) + if (s.title.length > 18) "..." else "",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    },
+                    trailingIcon = if (sessions.size > 1 && isSelected) {
+                        {
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clickable {
+                                        ChatSessionRepository.deleteSession(s.id)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
                                     text = "✕",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.clickable {
-                                        ChatSessionRepository.deleteSession(s.id)
-                                    }
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
                         }
-                    },
+                    } else null,
                     shape = RoundedCornerShape(12.dp),
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -233,7 +236,7 @@ fun ContextualChatScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = if (activeDocs.isNotEmpty()) activeDocs.joinToString(", ") { it.title } else "Ready to teach any subject: System Design, IT, Math, Science",
+                                text = if (activeDocs.isNotEmpty()) activeDocs.joinToString(", ") { it.title } else "Ready to teach any subject: Humanities, Sciences, Math, History, Tech",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1
@@ -270,10 +273,10 @@ fun ContextualChatScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 val suggestions = listOf(
-                    "💻 System Design & Architecture",
-                    "🏛️ Microservices vs Monolith",
-                    "🗄️ Caching & Database Sharding",
-                    "🧠 Calculus & Differential Equations"
+                    "🇵🇭 Life and Works of Rizal",
+                    "📐 Discrete Mathematics",
+                    "🤖 Emerging Technologies",
+                    "🏛️ World History & Politics"
                 )
                 Row(
                     modifier = Modifier
@@ -405,7 +408,7 @@ fun ContextualChatScreen(
                 onValueChange = { inputText = it },
                 placeholder = {
                     Text(
-                        text = if (activeDocs.isNotEmpty()) "Ask about notes or any topic..." else "Ask any subject (e.g. System Design)...",
+                        text = if (activeDocs.isNotEmpty()) "Ask about notes or any topic..." else "Ask any subject (e.g. Discrete Math, Rizal, Tech)...",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 },

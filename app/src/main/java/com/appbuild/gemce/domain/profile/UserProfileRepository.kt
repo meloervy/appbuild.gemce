@@ -22,7 +22,7 @@ object UserProfileRepository {
         StudentProfile(
             academicLevel = AcademicLevel.COLLEGE,
             seniorHighStrand = null,
-            collegeCourse = "BS Computer Science / IT / IS",
+            collegeCourse = null,
             preferredLanguage = LanguageMode.EN,
             isConfigured = false
         )
@@ -42,7 +42,7 @@ object UserProfileRepository {
         }
 
         val strand = sp.getString(KEY_STRAND, null)
-        val course = sp.getString(KEY_COLLEGE_COURSE, "BS Computer Science / IT / IS")
+        val course = sp.getString(KEY_COLLEGE_COURSE, null)
         val langCode = sp.getString(KEY_PREFERRED_LANG, LanguageMode.EN.code) ?: LanguageMode.EN.code
         val lang = LanguageMode.values().find { it.code == langCode } ?: LanguageMode.EN
 

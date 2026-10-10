@@ -299,7 +299,7 @@ fun LibraryScreen(
                     value = newFolderName,
                     onValueChange = { newFolderName = it },
                     label = { Text("Folder Name") },
-                    placeholder = { Text("e.g. System Design, Calculus, Organic Chemistry...") },
+                    placeholder = { Text("e.g. Discrete Math, Rizal, Emerging Tech, History...") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
