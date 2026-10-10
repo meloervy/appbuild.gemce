@@ -93,19 +93,11 @@ fun AdaptiveStudyHubScreen(
     var isGenerating by remember { mutableStateOf(false) }
 
     fun generateAndStart(goal: StudyGoal) {
-        val topic = customTopicInput.ifBlank { activeSections.firstOrNull()?.title ?: "General Study Topic" }
+        val topic = customTopicInput.ifBlank { activeSections.firstOrNull()?.title ?: "Earth and Life Science" }
         val matchingSection = activeSections.firstOrNull {
             it.title.contains(topic, ignoreCase = true) || topic.contains(it.title, ignoreCase = true)
         }
-        val sectionContent = if (matchingSection != null) {
-            matchingSection.text
-        } else if (customTopicInput.isNotBlank()) {
-            "Comprehensive academic subject: $topic.\nCore principles, concepts, historical or technical background, definitions, and practical applications of $topic."
-        } else if (activeSections.isNotEmpty()) {
-            activeSections.first().text
-        } else {
-            "Comprehensive academic subject: $topic.\nCore principles, concepts, definitions, and foundational knowledge of $topic."
-        }
+        val sectionContent = resolveTopicContent(topic, matchingSection, activeSections)
 
         coroutineScope.launch {
             isGenerating = true
@@ -194,7 +186,11 @@ fun AdaptiveStudyHubScreen(
                     3 -> {
                         // Reviewer
                         keyPoints.clear()
-                        val prompt = "Generate key points for reviewer in ${selectedLanguage.label}:\n$sectionContent"
+                        val prompt = PromptBuilder.buildReviewerPrompt(
+                            sectionText = sectionContent,
+                            language = selectedLanguage,
+                            profile = studentProfile
+                        )
                         var buffer = ""
                         currentEngine.generateStream(prompt).collect { chunk ->
                             buffer += chunk
@@ -266,7 +262,7 @@ fun AdaptiveStudyHubScreen(
                     OutlinedTextField(
                         value = customTopicInput,
                         onValueChange = { customTopicInput = it },
-                        placeholder = { Text("e.g. Discrete Math, Life & Works of Rizal, Emerging Tech, Biology...") },
+                        placeholder = { Text("e.g. Earth and Life Science, Discrete Math, Rizal, Biology...") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         singleLine = true
@@ -290,6 +286,7 @@ fun AdaptiveStudyHubScreen(
                             activeSections.map { it.title }
                         } else {
                             listOf(
+                                "Earth and Life Science",
                                 "Discrete Mathematics",
                                 "Life & Works of Rizal",
                                 "Emerging Technologies",
@@ -539,5 +536,56 @@ fun AdaptiveStudyHubScreen(
                 }
             }
         }
+    }
+}
+
+private fun resolveTopicContent(topic: String, matchingSection: Section?, activeSections: List<Section>): String {
+    if (matchingSection != null) return matchingSection.text
+    val t = topic.lowercase()
+    return when {
+        t.contains("earth") || t.contains("life science") || t.contains("lief science") ||
+                t.contains("geology") || t.contains("rock") || t.contains("mineral") ||
+                t.contains("biosphere") || t.contains("geosphere") || t.contains("hydrosphere") -> """
+            Earth and Life Science is an integrated academic discipline exploring terrestrial processes and biological systems.
+            The four interconnected subsystems of Earth are the Geosphere (solid rocks and geological interior), the Hydrosphere (all liquid and frozen waters), the Atmosphere (gaseous envelope protecting life), and the Biosphere (all living organisms).
+            Earth Science comprises four primary branches: Geology (study of Earth materials, structures, and history), Meteorology (study of atmosphere and weather), Oceanography (study of marine systems), and Astronomy (cosmic context of Earth).
+            Rocks are classified into three major groups in the rock cycle: Igneous rocks (crystallized from cooling magma or lava), Sedimentary rocks (formed by deposition, compaction, and cementation of mineral particles), and Metamorphic rocks (transformed by intense heat and pressure).
+            Minerals are naturally occurring, inorganic solids with definite chemical composition and crystalline structure, identified by hardness (Mohs scale), streak color, luster reflection, and cleavage planes.
+            Plate Tectonics drives continental movement, volcanic activity, and earthquakes through mantle convection currents along divergent, convergent, and transform boundaries.
+            Life Science encompasses the origin of life, cellular structure, genetic continuity through DNA and RNA, metabolic energy transfer, and ecological biodiversity across terrestrial and aquatic ecosystems.
+        """.trimIndent()
+
+        t.contains("rizal") || t.contains("noli") || t.contains("fili") -> """
+            The Life and Works of Jose Rizal examines Dr. Jose Rizal's contributions to Philippine nationalism and literature.
+            Rizal authored Noli Me Tangere in Berlin (1887) to expose the social cancer and friar abuses in colonial Philippines.
+            His sequel El Filibusterismo was published in Ghent (1891) and dedicated to the martyred priests Gomburza (Gomez, Burgos, Zamora).
+            Rizal founded La Liga Filipina in Tondo (1892) advocating civic unity and educational reform before his four-year exile in Dapitan.
+            He was executed at Bagumbayan on December 30, 1896, leaving his final poem Mi Último Adiós as a testament to freedom.
+        """.trimIndent()
+
+        t.contains("discrete") || t.contains("logic") || t.contains("graph") || t.contains("combinatorics") -> """
+            Discrete Mathematics studies mathematical structures that are fundamentally discrete rather than continuous.
+            Propositional logic evaluates truth values of compound statements using connectives NOT, AND, OR, conditional implications, and biconditionals.
+            Proof techniques include direct proof, proof by contradiction, contrapositive, and Mathematical Induction consisting of the Base Step and Inductive Step.
+            The Pigeonhole Principle states that if n items are placed into k containers and n > k, at least one container must contain two or more items.
+            The Power Set P(S) of a finite set with n elements has cardinality 2^n.
+            In Graph Theory, an Eulerian path traverses every edge of a graph exactly once, while a Hamiltonian path visits every vertex once.
+        """.trimIndent()
+
+        t.contains("emerging") || t.contains("quantum") || t.contains("blockchain") || t.contains("ai") || t.contains("transformer") -> """
+            Emerging Technologies encompass transformative innovations shaping modern computation and society.
+            Quantum computing leverages qubits that exist in quantum superposition (|0> and |1> states simultaneously) and quantum entanglement.
+            Blockchain technology utilizes decentralized consensus mechanisms and cryptographic hashing to maintain immutable ledgers without central authority.
+            Modern artificial intelligence and Large Language Models rely on Transformer architectures driven by multi-head Self-Attention mechanisms processing token sequences in parallel.
+            Edge computing processes data locally near physical sensors and end-user devices to minimize latency and bandwidth consumption.
+        """.trimIndent()
+
+        activeSections.isNotEmpty() -> activeSections.first().text
+
+        else -> """
+            Academic Subject: $topic.
+            Core definitions, foundational principles, scientific or analytical classifications, operational mechanisms, and empirical applications of $topic.
+            Systematic analysis of $topic connects fundamental theoretical concepts with verifiable evidence and problem-solving methodologies.
+        """.trimIndent()
     }
 }

@@ -85,6 +85,7 @@ class FakeEngine(
     }
 
     private enum class TopicCategory {
+        EARTH_AND_LIFE_SCIENCE,
         RIZAL,
         DISCRETE_MATH,
         EMERGING_TECH,
@@ -104,6 +105,12 @@ class FakeEngine(
         }
         val lower = userContent.lowercase()
         return when {
+            lower.contains("earth") || lower.contains("life science") || lower.contains("lief science") ||
+                    lower.contains("geology") || lower.contains("rock") || lower.contains("mineral") ||
+                    lower.contains("biosphere") || lower.contains("geosphere") || lower.contains("hydrosphere") ||
+                    lower.contains("plate tectonic") || lower.contains("weathering") || lower.contains("igneous") ||
+                    lower.contains("sedimentary") || lower.contains("metamorphic") -> TopicCategory.EARTH_AND_LIFE_SCIENCE
+
             lower.contains("rizal") || lower.contains("noli") || lower.contains("fili") ||
                     lower.contains("dapitan") || lower.contains("bagumbayan") || lower.contains("gomburza") -> TopicCategory.RIZAL
 
@@ -127,6 +134,30 @@ class FakeEngine(
         }
     }
 
+    private fun parseSubjectAndPredicate(sentence: String): Pair<String, String> {
+        val s = sentence.trim().trimEnd('.')
+        val delimiters = listOf(
+            " is defined as ", " refers to ", " consists of ", " encompasses ",
+            " is characterized by ", " are classified into ", " is ", " are ", ": "
+        )
+        for (delim in delimiters) {
+            if (s.contains(delim, ignoreCase = true)) {
+                val sub = s.substringBefore(delim).trim()
+                val pred = s.substringAfter(delim).trim()
+                if (sub.length in 3..50 && pred.length >= 8) {
+                    return Pair(sub, pred)
+                }
+            }
+        }
+        val commaIdx = s.indexOf(',')
+        if (commaIdx in 5..40) {
+            val sub = s.substring(0, commaIdx).trim()
+            val pred = s.substring(commaIdx + 1).trim()
+            if (pred.length >= 8) return Pair(sub, pred)
+        }
+        return Pair(s.take(35).trimEnd(), s)
+    }
+
     private fun extractSubstantiveSentences(prompt: String): List<String> {
         val sourceText = when {
             prompt.contains("SOURCE TEXT:\n") -> prompt.substringAfter("SOURCE TEXT:\n").trim()
@@ -138,9 +169,19 @@ class FakeEngine(
         }
         val lines = sourceText.split(Regex("""(?<=[.?!])\s+|\n+"""))
             .map { it.trim().trimEnd('.') }
-            .filter { it.length >= 20 && !it.startsWith("[") && !it.startsWith("TASK:") }
+            .filter { line ->
+                line.length >= 20 &&
+                        !line.startsWith("[") &&
+                        !line.startsWith("TASK:") &&
+                        !line.startsWith("RULES:") &&
+                        !line.startsWith("CORE SYSTEM RULES:") &&
+                        !line.startsWith("CRITICAL NEGATIVE CONSTRAINT:") &&
+                        !line.startsWith("Comprehensive academic subject") &&
+                        !line.startsWith("Academic Subject:") &&
+                        !line.contains("Core principles, concepts")
+            }
 
-        return if (lines.isNotEmpty()) lines else listOf(sourceText.trim().trimEnd('.'))
+        return lines
     }
 
     private fun evaluateStudentAnswer(prompt: String): List<String> {
@@ -170,13 +211,31 @@ class FakeEngine(
             val sentences = extractSubstantiveSentences(prompt)
             if (sentences.isNotEmpty()) {
                 return sentences.take(4).map { s ->
-                    val concept = s.take(35).trimEnd()
-                    """{"type":"card","front":"What is the key insight regarding: $concept?","back":"$s.","evidence":"$s."}"""
+                    val (subject, predicate) = parseSubjectAndPredicate(s)
+                    """{"type":"card","front":"Define or explain the role of: $subject","back":"$predicate.","evidence":"$s."}"""
                 }
             }
         }
 
         return when (topic) {
+            TopicCategory.EARTH_AND_LIFE_SCIENCE -> if (isEnglish) {
+                listOf(
+                    """{"type":"card","front":"What are the four interconnected subsystems (spheres) of the Earth?","back":"Geosphere (solid rocks & crust), Hydrosphere (all water bodies), Atmosphere (protective gaseous envelope), and Biosphere (all living organisms).","evidence":"The four interconnected subsystems of Earth are the Geosphere, Hydrosphere, Atmosphere, and Biosphere."}""",
+                    """{"type":"card","front":"What are the three major classifications of rocks in the rock cycle?","back":"Igneous rocks (crystallized from cooled magma/lava), Sedimentary rocks (compacted/cemented mineral sediments), and Metamorphic rocks (transformed by subterranean heat and pressure).","evidence":"Rocks are classified into three major groups in the rock cycle: Igneous rocks, Sedimentary rocks, and Metamorphic rocks."}""",
+                    """{"type":"card","front":"What physical properties are primarily used to identify minerals in geology?","back":"Hardness (measured on the Mohs scale from 1 to 10), Streak (powdered color), Luster (light reflection), Cleavage/Fracture, and Specific Gravity.","evidence":"Minerals are naturally occurring, inorganic solids with definite chemical composition and crystalline structure, identified by hardness, streak color, luster reflection, and cleavage planes."}""",
+                    """{"type":"card","front":"What are the four foundational branches of Earth Science?","back":"Geology (study of Earth materials, structures, and history), Meteorology (atmosphere and weather), Oceanography (marine systems), and Astronomy (cosmic context of Earth).","evidence":"Earth Science comprises four primary branches: Geology, Meteorology, Oceanography, and Astronomy."}""",
+                    """{"type":"card","front":"What is the primary driving mechanism of Plate Tectonics?","back":"Thermal convection currents in the underlying mantle (asthenosphere) moving lithospheric plates across convergent, divergent, and transform boundaries.","evidence":"Plate Tectonics drives continental movement, volcanic activity, and earthquakes through mantle convection currents along divergent, convergent, and transform boundaries."}""",
+                    """{"type":"card","front":"What defines the Biosphere within the Earth system?","back":"The global ecological system integrating all living organisms and their relationships with the lithosphere, hydrosphere, and atmosphere.","evidence":"The Biosphere comprises all living organisms across terrestrial and aquatic ecosystems."}"""
+                )
+            } else {
+                listOf(
+                    """{"type":"card","front":"Ano ang apat na magkakaugnay na subsystems (spheres) ng Daigdig?","back":"Geosphere (lupa at mga bato), Hydrosphere (lahat ng katubigan), Atmosphere (hangin at proteksyon), at Biosphere (lahat ng may buhay).","evidence":"The four interconnected subsystems of Earth are the Geosphere, Hydrosphere, Atmosphere, and Biosphere."}""",
+                    """{"type":"card","front":"Ano ang tatlong pangunahing uri ng bato sa Rock Cycle?","back":"Igneous rocks (mula sa lumamig na magma/lava), Sedimentary rocks (mula sa naipong sediments), at Metamorphic rocks (nabuo dahil sa matinding init at presyon).","evidence":"Rocks are classified into three major groups in the rock cycle: Igneous rocks, Sedimentary rocks, and Metamorphic rocks."}""",
+                    """{"type":"card","front":"Anong mga pisikal na katangian ang ginagamit sa pagsusuri ng minerals?","back":"Hardness (Mohs scale mula 1 hanggang 10), Streak (kulay ng pulbos), Luster (kinang), Cleavage/Fracture, at Specific Gravity.","evidence":"Minerals are naturally occurring, inorganic solids with definite chemical composition and crystalline structure, identified by hardness, streak color, luster reflection, and cleavage planes."}""",
+                    """{"type":"card","front":"Ano ang apat na pangunahing sangay ng Earth Science?","back":"Geology (kayarian ng lupa), Meteorology (panahon at klima), Oceanography (karagatan), at Astronomy (kalawakan).","evidence":"Earth Science comprises four primary branches: Geology, Meteorology, Oceanography, and Astronomy."}"""
+                )
+            }
+
             TopicCategory.RIZAL -> if (isEnglish) {
                 listOf(
                     """{"type":"card","front":"What was the primary objective of Jose Rizal's novel 'Noli Me Tangere'?","back":"To expose the social cancer, friar abuses, and colonial corruption in 19th-century Philippines.","evidence":"Noli Me Tangere was written to expose the social cancer and friar abuses in the Philippines."}""",
@@ -245,8 +304,8 @@ class FakeEngine(
             )
 
             TopicCategory.CUSTOM_NOTES, TopicCategory.GENERAL -> listOf(
-                """{"type":"card","front":"What is the central foundational concept of this topic?","back":"Understanding the core definitions, structural relationships, and analytical principles of the subject.","evidence":"Foundational principles govern domain analysis and problem solving."}""",
-                """{"type":"card","front":"How is this subject applied to academic problem-solving?","back":"By systematically evaluating inputs, applying domain principles, and deriving verifiable conclusions.","evidence":"Systematic evaluation of principles leads to accurate academic analysis."}"""
+                """{"type":"card","front":"What is the foundational definition of this academic concept?","back":"A systematically structured principle describing verified domain mechanisms and empirical relationships.","evidence":"Foundational principles govern domain analysis and problem solving."}""",
+                """{"type":"card","front":"How is this concept applied in problem-solving?","back":"By systematically evaluating inputs, applying verified rules, and deriving verifiable conclusions.","evidence":"Systematic evaluation of principles leads to accurate academic analysis."}"""
             )
         }
     }
@@ -255,15 +314,21 @@ class FakeEngine(
         if (topic == TopicCategory.CUSTOM_NOTES) {
             val sentences = extractSubstantiveSentences(prompt)
             if (sentences.isNotEmpty()) {
-                val first = sentences.first()
-                return listOf(
-                    """{"type":"mcq","stem":"Which statement accurately reflects the study source?","choices":["$first","This statement is unverified and contradicts the text","The concept has no verified application","The phenomenon operates inversely without documentation"],"answer":0,"explanation":"Directly established in the source text.","evidence":"$first"}""",
-                    """{"type":"mcq","stem":"What is the primary conclusion drawn regarding this subject?","choices":["It requires secondary confirmation outside scope","$first","It remains completely disputed in academic analysis","The mechanism functions only under isolated lab conditions"],"answer":1,"explanation":"Confirmed by the provided learning material.","evidence":"$first"}"""
-                )
+                return sentences.take(3).map { s ->
+                    val (subject, predicate) = parseSubjectAndPredicate(s)
+                    """{"type":"mcq","stem":"According to the study notes, what is defined as or characterized by: ${predicate.take(65)}...?","choices":["$subject","An unverified external hypothesis","An inverse environmental factor","A non-essential secondary variable"],"answer":0,"explanation":"Directly established in the source text: $s.","evidence":"$s."}"""
+                }
             }
         }
 
         return when (topic) {
+            TopicCategory.EARTH_AND_LIFE_SCIENCE -> listOf(
+                """{"type":"mcq","stem":"Which Earth subsystem encompasses all living organisms and their interacting biological habitats?","choices":["Biosphere","Geosphere","Hydrosphere","Atmosphere"],"answer":0,"explanation":"The biosphere includes all life forms on Earth and their interactions with other physical spheres.","evidence":"The Biosphere comprises all living organisms."}""",
+                """{"type":"mcq","stem":"Which classification of rocks forms directly from the crystallization and cooling of molten magma or lava?","choices":["Sedimentary rocks","Igneous rocks","Metamorphic rocks","Evaporite rocks"],"answer":1,"explanation":"Igneous rocks (such as basalt and granite) solidify directly from molten rock material.","evidence":"Igneous rocks are crystallized from cooling magma or lava."}""",
+                """{"type":"mcq","stem":"Which physical property tests a mineral's relative resistance to scratching on a standard scale from 1 (Talc) to 10 (Diamond)?","choices":["Streak color","Mohs Hardness scale","Luster index","Cleavage plane"],"answer":1,"explanation":"The Mohs Hardness scale measures the scratch resistance of minerals in geological identification.","evidence":"Minerals are identified by hardness on the Mohs scale."}""",
+                """{"type":"mcq","stem":"Which branch of Earth Science specializes in the study of Earth materials, structures, processes, and historical rock layers?","choices":["Oceanography","Meteorology","Geology","Astronomy"],"answer":2,"explanation":"Geology focuses specifically on the physical composition, processes, and historical structures of the solid Earth.","evidence":"Earth Science comprises four primary branches: Geology, Meteorology, Oceanography, and Astronomy."}"""
+            )
+
             TopicCategory.RIZAL -> listOf(
                 """{"type":"mcq","stem":"To whose memory did Jose Rizal dedicate his second novel, 'El Filibusterismo'?","choices":["The Katipunan leadership","His family in Calamba","The martyred priests Mariano Gomez, Jose Burgos, and Jacinto Zamora (Gomburza)","The reformist writers of La Solidaridad"],"answer":2,"explanation":"Rizal dedicated El Filibusterismo to the memory of the secular priests executed in 1872.","evidence":"El Filibusterismo was dedicated to the martyrdom of Gomburza in 1872."}""",
                 """{"type":"mcq","stem":"What civic reform organization did Rizal establish in Tondo, Manila in July 1892?","choices":["Katipunan","La Liga Filipina","Propaganda Movement","Ilustrados del Norte"],"answer":1,"explanation":"Rizal established La Liga Filipina before his exile to Dapitan.","evidence":"Rizal established La Liga Filipina in Tondo to unite the archipelago and foster mutual assistance."}""",
@@ -294,15 +359,22 @@ class FakeEngine(
     }
 
     private fun generateShortAnswers(prompt: String, topic: TopicCategory, isEnglish: Boolean): List<String> {
-        val sentences = extractSubstantiveSentences(prompt)
-        if (sentences.isNotEmpty()) {
-            val s = sentences.first()
-            return listOf(
-                """{"type":"short","stem":"Explain the principal mechanism or concept described in the text: '${s.take(40)}...'?","reference_answer":"$s.","rubric":["$s","verifiable grounding in source"],"evidence":"$s."}"""
-            )
+        if (topic == TopicCategory.CUSTOM_NOTES) {
+            val sentences = extractSubstantiveSentences(prompt)
+            if (sentences.isNotEmpty()) {
+                return sentences.take(2).map { s ->
+                    val (subject, predicate) = parseSubjectAndPredicate(s)
+                    """{"type":"short","stem":"Based on your study notes, explain the significance and definition of $subject.","reference_answer":"$s.","rubric":["$subject","${predicate.take(30)}"],"evidence":"$s."}"""
+                }
+            }
         }
 
         return when (topic) {
+            TopicCategory.EARTH_AND_LIFE_SCIENCE -> listOf(
+                """{"type":"short","stem":"Explain how the Geosphere, Hydrosphere, and Atmosphere interact to sustain living organisms in the Biosphere.","reference_answer":"The geosphere provides solid physical substrate, soil, and essential minerals; the hydrosphere supplies liquid water required for cellular metabolism; and the atmosphere provides vital gases (oxygen and carbon dioxide) while filtering harmful solar radiation. These interacting cycles maintain the dynamic equilibrium necessary for organisms in the biosphere.","rubric":["geosphere supplies minerals and soil","hydrosphere supplies liquid water for metabolism","atmosphere provides gases like O2/CO2 and radiation protection","systemic interaction sustains life in the biosphere"],"evidence":"The four interconnected subsystems of Earth are the Geosphere, Hydrosphere, Atmosphere, and Biosphere."}""",
+                """{"type":"short","stem":"Differentiate between Igneous, Sedimentary, and Metamorphic rocks based on their geological formation in the rock cycle.","reference_answer":"Igneous rocks solidify from the cooling of molten magma or lava. Sedimentary rocks form through weathering, erosion, deposition, compaction, and cementation of mineral particles. Metamorphic rocks form when pre-existing rocks undergo profound physical or chemical alteration due to intense subterranean heat and pressure without melting.","rubric":["igneous formed from cooling molten magma/lava","sedimentary formed from compaction and cementation of sediments","metamorphic formed from extreme heat and pressure transforming existing rocks"],"evidence":"Rocks are classified into three major groups in the rock cycle: Igneous rocks, Sedimentary rocks, and Metamorphic rocks."}"""
+            )
+
             TopicCategory.RIZAL -> listOf(
                 """{"type":"short","stem":"Explain the contrasting themes and approaches between Rizal's 'Noli Me Tangere' and 'El Filibusterismo'.","reference_answer":"Noli Me Tangere is a social novel focusing on exposing societal ills, friar abuses, and advocating peaceful reform, while El Filibusterismo is a darker political novel exploring the moral consequences and futility of armed vengeance and revolution.","rubric":["Noli focuses on peaceful reform and exposing friar abuses","Fili explores armed revolution and political vengeance"],"evidence":"Noli Me Tangere depicts social cancer and reform while El Filibusterismo deals with political rebellion."}""",
                 """{"type":"short","stem":"How did Jose Rizal contribute to the community during his four-year exile in Dapitan?","reference_answer":"In Dapitan, Rizal practiced ophthalmology and medicine, built a school for local boys, constructed a clean municipal waterworks aqueduct system, and collected biological specimens.","rubric":["practiced medicine and surgery","built a community school and water aqueduct system"],"evidence":"Rizal lived in exile in Dapitan where he practiced medicine and built a school."}"""
@@ -339,6 +411,14 @@ class FakeEngine(
         }
 
         return when (topic) {
+            TopicCategory.EARTH_AND_LIFE_SCIENCE -> listOf(
+                """{"type":"point","text":"Earth operates through four interacting subsystems: Geosphere (solid rock, crust, and mantle), Hydrosphere (liquid and frozen waters), Atmosphere (gaseous envelope), and Biosphere (all living organisms).","evidence":"The four interconnected subsystems of Earth are the Geosphere, Hydrosphere, Atmosphere, and Biosphere."}""",
+                """{"type":"point","text":"The four foundational branches of Earth Science are Geology (terrestrial structures and minerals), Meteorology (atmospheric processes and climate), Oceanography (marine oceanic systems), and Astronomy (cosmic context).","evidence":"Earth Science comprises four primary branches: Geology, Meteorology, Oceanography, and Astronomy."}""",
+                """{"type":"point","text":"The Rock Cycle continuously transforms material among Igneous (solidified magma/lava), Sedimentary (compacted sediments), and Metamorphic rocks (heat/pressure recrystallization).","evidence":"Rocks are classified into three major groups in the rock cycle: Igneous rocks, Sedimentary rocks, and Metamorphic rocks."}""",
+                """{"type":"point","text":"Minerals are naturally occurring inorganic solids with crystalline order, identified through Mohs hardness (1-10), streak powder color, light luster, and cleavage fracture planes.","evidence":"Minerals are naturally occurring, inorganic solids with definite chemical composition and crystalline structure, identified by hardness, streak color, luster reflection, and cleavage planes."}""",
+                """{"type":"point","text":"Plate Tectonics drives continental drift, seismic activity, volcanism, and mountain formation via thermal mantle convection currents along convergent, divergent, and transform boundaries.","evidence":"Plate Tectonics drives continental movement, volcanic activity, and earthquakes through mantle convection currents along convergent, divergent, and transform boundaries."}"""
+            )
+
             TopicCategory.RIZAL -> listOf(
                 """{"type":"point","text":"Jose Rizal wrote 'Noli Me Tangere' (Berlin, 1887) and 'El Filibusterismo' (Ghent, 1891) to expose colonial corruption and inspire national consciousness.","evidence":"Noli Me Tangere was written to expose the social cancer and friar abuses in the Philippines."}""",
                 """{"type":"point","text":"He established La Liga Filipina in Tondo (1892) advocating peaceful socio-economic unity and educational advancement.","evidence":"Rizal established La Liga Filipina in Tondo to unite the archipelago and foster mutual assistance."}""",
@@ -390,6 +470,50 @@ class FakeEngine(
         }
 
         return when (topic) {
+            TopicCategory.EARTH_AND_LIFE_SCIENCE -> if (isEnglish) {
+                listOf(
+                    "[General Academic Knowledge - Earth and Life Science]\n\n",
+                    "### 🌍 Earth and Life Science Comprehensive Review\n\n",
+                    "Earth and Life Science integrates planetary geology, atmospheric sciences, and biological systems.\n\n",
+                    "**1. The Four Earth Subsystems (Spheres):**\n",
+                    "| Subsystem | Components | Function in Earth System |\n",
+                    "| :--- | :--- | :--- |\n",
+                    "| **Geosphere** | Crust, mantle, rocks, soil | Provides minerals, nutrients, and physical substrate |\n",
+                    "| **Hydrosphere** | Oceans, rivers, ice caps, groundwater | Essential for cellular metabolism and hydrological cycles |\n",
+                    "| **Atmosphere** | N₂ (78%), O₂ (21%), CO₂, trace gases | Shields solar UV radiation and regulates planetary temperature |\n",
+                    "| **Biosphere** | All flora, fauna, microorganisms | Drives biogeochemical cycles and ecological food webs |\n\n",
+                    "**2. The Rock Cycle & Mineral Identification:**\n",
+                    "- **Igneous Rocks:** Formed by cooling magma (intrusive, e.g., granite) or lava (extrusive, e.g., basalt).\n",
+                    "- **Sedimentary Rocks:** Formed by deposition, compaction, and cementation of mineral sediments (e.g., sandstone, limestone).\n",
+                    "- **Metamorphic Rocks:** Pre-existing rocks transformed by subterranean heat and pressure without melting (e.g., marble, slate).\n",
+                    "- **Mineral Properties:** Tested using **Mohs Hardness Scale** (1=Talc to 10=Diamond), **Streak** (powder color on porcelain), **Luster** (metallic vs. non-metallic), and **Cleavage** (planes of weakness).\n\n",
+                    "**3. Plate Tectonics & Internal Heat:**\n",
+                    "- Mantle thermal convection currents drive the movement of rigid lithospheric plates.\n",
+                    "- **Boundaries:** Convergent (subduction zones & mountain building), Divergent (mid-ocean ridges & rift valleys), Transform (strike-slip faults like San Andreas).\n\n",
+                    "**4. Life Science & Biological Continuity:**\n",
+                    "- **Cell Theory:** All organisms consist of cells, the basic unit of life, arising from pre-existing cells.\n",
+                    "- **Central Dogma:** Information flows from DNA $\\rightarrow$ RNA $\\rightarrow$ functional Proteins.\n\n",
+                    "> **Study Tip:** Remember that Earth operates as a *closed system* for matter (which cycles continuously) but an *open system* for energy (which enters as solar radiation and exits as infrared heat)."
+                )
+            } else {
+                listOf(
+                    "[General Academic Knowledge - Earth and Life Science]\n\n",
+                    "### 🌍 Gabay sa Earth and Life Science\n\n",
+                    "Ang Earth and Life Science ay sumasaklaw sa kayarian ng Daigdig, mga likas na yaman, at ang pinagmulan at pagpapanatili ng buhay.\n\n",
+                    "**1. Apat na Subsystems ng Daigdig:**\n",
+                    "- **Geosphere:** Ang solidong bahagi ng mundo kabilang ang crust, mantle, mga bato, at lupa.\n",
+                    "- **Hydrosphere:** Lahat ng anyong tubig kabilang ang karagatan, ilog, at yelo.\n",
+                    "- **Atmosphere:** Ang hanging bumabalot sa daigdig na nagbibigay ng oxygen at sumasala sa UV rays.\n",
+                    "- **Biosphere:** Lahat ng may buhay na nilalang at ang kanilang mga tirahan.\n\n",
+                    "**2. Ang Rock Cycle at Minerals:**\n",
+                    "- **Igneous:** Nabubuo mula sa lumamig na magma o lava.\n",
+                    "- **Sedimentary:** Nabubuo sa pamamagitan ng compaction at cementation ng mga sediments.\n",
+                    "- **Metamorphic:** Nagbabagong-anyo dahil sa matinding init at presyon sa ilalim ng lupa.\n",
+                    "- **Mohs Hardness Scale:** Pamantayan sa tibay ng mineral laban sa gasgas (1 = Talc, 10 = Diamond).\n\n",
+                    "> **Pang-Review Tip:** Tandaan na ang Rock Cycle ay tuluy-tuloy na proseso ng pagpapalit-anyo ng mga bato sa ilalim at ibabaw ng daigdig."
+                )
+            }
+
             TopicCategory.RIZAL -> if (isEnglish) {
                 listOf(
                     "[General Academic Knowledge - Philippine History & Literature]\n\n",
@@ -518,6 +642,22 @@ class FakeEngine(
             .ifBlank { "Core Academic Concept" }
 
         return when (topic) {
+            TopicCategory.EARTH_AND_LIFE_SCIENCE -> if (isEnglish) {
+                listOf(
+                    "### 💡 Earth and Life Science: $concept\n\n",
+                    "**Core Meaning:** Earth operates as a harmonious, dynamic super-system where terrestrial processes and biological organisms are fundamentally interdependent. The four subsystems (Geosphere, Hydrosphere, Atmosphere, and Biosphere) do not exist in isolation; an event in one sphere triggers immediate ripple effects across the others.\n\n",
+                    "> **Real-World Analogy:** Think of the Earth as a living human body: The **Geosphere** is the skeleton (providing firm structure and mineral reservoirs), the **Hydrosphere** is the circulatory bloodstream (transporting moisture and vital solutes worldwide), the **Atmosphere** is the respiratory lungs (exchanging vital oxygen and carbon dioxide while filtering harmful solar extremes), and the **Biosphere** represents the living cells functioning together inside this thriving organism.\n\n",
+                    "**Exam Recall Tip:** When analyzing any geological or biological question on exams, always trace the flow of matter (e.g., carbon, water, and rock cycles) and energy between these four spheres!"
+                )
+            } else {
+                listOf(
+                    "### 💡 Paliwanag sa Earth and Life Science: $concept\n\n",
+                    "**Kahulugan:** Ang Daigdig ay isang malaking sistema kung saan magkakaugnay ang lupa (Geosphere), tubig (Hydrosphere), hangin (Atmosphere), at mga may buhay (Biosphere). Ang anumang pagbabago sa isang bahagi ay may direktang epekto sa iba.\n\n",
+                    "> **Analohiya:** Isipin ang Daigdig bilang katawan ng tao: Ang **Geosphere** ang kalansay o buto, ang **Hydrosphere** ang dugo na dumadaloy at nagdadala ng sustansya, ang **Atmosphere** ang baga na humihinga, at ang **Biosphere** ang mga buhay na selula na nagpapanatili ng buhay.\n\n",
+                    "**Pang-Review Tip:** Tandaan na ang enerhiya ay nagmumula sa Araw habang ang mga materyales (tulad ng tubig, carbon, at bato) ay patuloy na nagre-recycle sa buong daigdig."
+                )
+            }
+
             TopicCategory.RIZAL -> listOf(
                 "### 💡 Rizal Academic Concept: $concept\n\n",
                 "**Core Meaning:** In Philippine history and literature, this concept embodies the socio-political realities of 19th-century Spanish colonial rule and Jose Rizal's intellectual campaign for Filipino dignity, secular rights, and educational emancipation.\n\n",

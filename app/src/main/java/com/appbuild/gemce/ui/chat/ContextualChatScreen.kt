@@ -273,6 +273,7 @@ fun ContextualChatScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 val suggestions = listOf(
+                    "🌍 Earth and Life Science",
                     "🇵🇭 Life and Works of Rizal",
                     "📐 Discrete Mathematics",
                     "🤖 Emerging Technologies",

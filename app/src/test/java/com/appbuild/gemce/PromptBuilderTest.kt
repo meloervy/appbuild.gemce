@@ -87,4 +87,32 @@ class PromptBuilderTest {
         assertTrue(prompt.contains("Discrete Mathematics"))
         assertTrue(prompt.contains("Emerging Technologies"))
     }
+
+    @Test
+    fun testNegativeConstraintInFlashcardAndMcqPrompts() {
+        val flashcardPrompt = PromptBuilder.buildFlashcardPrompt(
+            sectionText = "Rocks and minerals",
+            language = LanguageMode.EN
+        )
+        assertTrue(flashcardPrompt.contains("CRITICAL NEGATIVE CONSTRAINT"))
+        assertTrue(flashcardPrompt.contains("DO NOT generate generic meta-questions"))
+
+        val mcqPrompt = PromptBuilder.buildMcqPrompt(
+            sectionText = "Earth systems",
+            language = LanguageMode.EN
+        )
+        assertTrue(mcqPrompt.contains("CRITICAL NEGATIVE CONSTRAINT"))
+        assertTrue(mcqPrompt.contains("DO NOT create generic meta-questions"))
+    }
+
+    @Test
+    fun testBuildReviewerPromptGeneratesPointSchema() {
+        val reviewerPrompt = PromptBuilder.buildReviewerPrompt(
+            sectionText = "Earth and Life Science",
+            language = LanguageMode.EN
+        )
+        assertTrue(reviewerPrompt.contains("{\"type\":\"point\""))
+        assertTrue(reviewerPrompt.contains("CRITICAL NEGATIVE CONSTRAINT"))
+        assertTrue(reviewerPrompt.contains("high-yield key reviewer points"))
+    }
 }

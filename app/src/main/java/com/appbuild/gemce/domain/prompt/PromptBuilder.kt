@@ -53,9 +53,13 @@ CORE SYSTEM RULES:
 $systemInstruction
 
 TASK: Generate exactly $count flashcards from the provided source text.
+RULES:
+1. Target high-yield factual terms, definitions, scientific classifications, formulas, and domain mechanisms.
+2. CRITICAL NEGATIVE CONSTRAINT: DO NOT generate generic meta-questions about user intent or study goals (e.g. NEVER ask "What was the user intended to study?" or "What does the text discuss?").
+3. Test direct subject knowledge (e.g. "What are the four branches of Earth science?", "Define minerals", "What are the three classifications of rocks?").
 
 JSONL SCHEMA:
-{"type":"card","front":"Question or concept prompt","back":"Direct explanation or definition","evidence":"Verbatim quote from text"}
+{"type":"card","front":"Direct factual question or concept prompt","back":"Direct explanation or definition","evidence":"Verbatim quote from text"}
 
 SOURCE TEXT:
 $sectionText
@@ -76,6 +80,8 @@ TASK: Generate exactly $count multiple-choice questions from the provided source
 RULES:
 1. Provide 4 plausible choices for each question.
 2. "answer" is the 0-based index (0, 1, 2, or 3) of the correct choice.
+3. CRITICAL NEGATIVE CONSTRAINT: DO NOT create generic meta-questions (e.g. NEVER ask "Which statement reflects the text?" or "What is discussed in the source?").
+4. Every stem MUST test a specific factual concept, scientific classification, process, formula, or relationship.
 
 JSONL SCHEMA:
 {"type":"mcq","stem":"Question text","choices":["Choice A","Choice B","Choice C","Choice D"],"answer":1,"explanation":"Why this is correct","evidence":"Verbatim quote from text"}
@@ -97,11 +103,36 @@ $systemInstruction
 
 TASK: Generate exactly $count short-answer questions for testing student comprehension.
 RULES:
-1. Ask questions that require explaining a concept or mechanism in 1-2 sentences.
+1. Ask questions that require explaining a specific concept, process, or mechanism in 1-2 sentences.
 2. Provide a model "reference_answer" and a list of key concepts in "rubric".
+3. CRITICAL NEGATIVE CONSTRAINT: DO NOT ask generic questions about the user or study goals. Test genuine domain knowledge.
 
 JSONL SCHEMA:
 {"type":"short","stem":"Question prompt","reference_answer":"Ideal complete answer","rubric":["key concept 1","key concept 2"],"evidence":"Verbatim quote from text"}
+
+SOURCE TEXT:
+$sectionText
+""".trimIndent()
+    }
+
+    fun buildReviewerPrompt(
+        sectionText: String,
+        count: Int = 4,
+        language: LanguageMode = LanguageMode.EN,
+        profile: StudentProfile? = null
+    ): String {
+        val systemInstruction = buildSystemInstruction(profile, language)
+        return """
+$systemInstruction
+
+TASK: Generate exactly $count high-yield key reviewer points summarizing the core subject matter.
+RULES:
+1. Focus on core factual concepts, scientific classifications, definitions, mechanisms, and principles.
+2. CRITICAL NEGATIVE CONSTRAINT: DO NOT generate generic meta-statements about the document or user intent.
+3. Every point must include verbatim quote evidence from the source.
+
+JSONL SCHEMA:
+{"type":"point","text":"Clear high-yield academic concept summary","evidence":"Verbatim quote from text"}
 
 SOURCE TEXT:
 $sectionText

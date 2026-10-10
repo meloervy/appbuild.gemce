@@ -97,4 +97,48 @@ class FakeEngineTest {
         assertTrue(outputs.contains("Discrete") || outputs.contains("Pigeonhole"))
         assertFalse(outputs.contains("System Design & Architecture Overview"))
     }
+
+    @Test
+    fun testEarthAndLifeScienceFlashcards() = runBlocking {
+        val prompt = PromptBuilder.buildFlashcardPrompt(
+            sectionText = "Subject: Earth and Life Science. Rocks, minerals, spheres of the earth, rock cycle, plate tectonics.",
+            language = LanguageMode.EN
+        )
+        val outputs = engine.generateStream(prompt).toList().joinToString("")
+        val parsed = JsonlParser.parseCard(outputs.lines().first { it.isNotBlank() })
+
+        assertNotNull(parsed)
+        assertTrue(outputs.contains("subsystems") || outputs.contains("Geosphere") || outputs.contains("rocks") || outputs.contains("minerals") || outputs.contains("Biosphere"))
+        assertFalse(outputs.contains("What was the user intended to study"))
+        assertFalse(outputs.contains("Mitochondria"))
+    }
+
+    @Test
+    fun testEarthAndLifeScienceTypoProducesRockAndMineralMcq() = runBlocking {
+        val prompt = PromptBuilder.buildMcqPrompt(
+            sectionText = "STUDENT'S CURRENT QUESTION:\nearth and lief science",
+            language = LanguageMode.EN
+        )
+        val outputs = engine.generateStream(prompt).toList().joinToString("")
+        val parsed = JsonlParser.parseMcq(outputs.lines().first { it.isNotBlank() })
+
+        assertNotNull(parsed)
+        assertTrue(outputs.contains("Biosphere") || outputs.contains("Igneous") || outputs.contains("Mohs") || outputs.contains("Geology"))
+        assertFalse(outputs.contains("What was the user intended to study"))
+        assertFalse(outputs.contains("Which statement accurately reflects the study source"))
+    }
+
+    @Test
+    fun testEarthAndLifeScienceReviewerPoints() = runBlocking {
+        val prompt = PromptBuilder.buildReviewerPrompt(
+            sectionText = "Earth and Life Science",
+            language = LanguageMode.EN
+        )
+        val outputs = engine.generateStream(prompt).toList().joinToString("")
+        val parsed = JsonlParser.parseKeyPoint(outputs.lines().first { it.isNotBlank() })
+
+        assertNotNull(parsed)
+        assertTrue(outputs.contains("subsystems") || outputs.contains("Geosphere") || outputs.contains("Rock Cycle") || outputs.contains("Minerals") || outputs.contains("Plate Tectonics"))
+        assertFalse(outputs.contains("What was the user intended to study"))
+    }
 }
