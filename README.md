@@ -9,6 +9,12 @@
 [![LiteRT-LM](https://img.shields.io/badge/On--Device_LLM-LiteRT--LM_Gemma_4_E2B-FF6F00?logo=google&logoColor=white)](https://ai.google.dev/edge)
 [![Offline](https://img.shields.io/badge/Network-100%25_Offline-success)](#privacy--offline-guarantee)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/meloervy/appbuild.gemce?color=orange&logo=github)](https://github.com/meloervy/appbuild.gemce/releases)
+
+### 📲 Direct APK Installation
+Download the ready-to-install Android APK directly from GitHub:
+- 🚀 **[Download Latest Gemce APK](https://github.com/meloervy/appbuild.gemce/releases)**
+- Every commit to `main` also automatically generates a fresh installable APK under GitHub **[Actions Artifacts](https://github.com/meloervy/appbuild.gemce/actions)**.
 
 ---
 
@@ -151,16 +157,20 @@ Once pushed, Gemce detects the model immediately on launch!
 
 ### Build Commands
 ```bash
+# Clone the repository
+git clone https://github.com/meloervy/appbuild.gemce.git
+cd appbuild.gemce
+
 # Set Java home to Android Studio JBR
 export JAVA_HOME=/opt/android-studio/jbr
 
 # Run all unit tests
 ./gradlew test
 
-# Assemble Debug APK
+# Assemble installable Debug APK
 ./gradlew assembleDebug
 
-# Install on connected device
+# Install directly on connected device
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
