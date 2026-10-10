@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -38,12 +39,17 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.appbuild.gemce.R
+import com.appbuild.gemce.ui.start.AppStartScreen
 import com.appbuild.gemce.ai.DownloadState
 import com.appbuild.gemce.ai.EngineStatus
 import com.appbuild.gemce.ai.FakeEngine
@@ -85,14 +91,22 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val appSettings by AppSettingsRepository.settings.collectAsState()
+            var showStartScreen by remember { mutableStateOf(true) }
+
             GemceTheme(
                 themeMode = appSettings.themeMode,
                 fontPreference = appSettings.fontPreference
             ) {
-                MainAppScaffold(
-                    fakeEngine = fakeEngine,
-                    liteRtLmEngine = liteRtLmEngine
-                )
+                if (showStartScreen) {
+                    AppStartScreen(
+                        onStartComplete = { showStartScreen = false }
+                    )
+                } else {
+                    MainAppScaffold(
+                        fakeEngine = fakeEngine,
+                        liteRtLmEngine = liteRtLmEngine
+                    )
+                }
             }
         }
     }
@@ -167,17 +181,29 @@ fun MainAppScaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = when (currentNavTab) {
-                            0 -> "Gemce Study Hub"
-                            1 -> "Ask Gemce"
-                            2 -> "Academic Library"
-                            3 -> "Settings & AI Engine"
-                            else -> "Gemce"
-                        },
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.gemce_logo),
+                            contentDescription = "Gemce Logo",
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                        Text(
+                            text = when (currentNavTab) {
+                                0 -> "Gemce Study Hub"
+                                1 -> "Ask Gemce"
+                                2 -> "Academic Library"
+                                3 -> "Settings & AI Engine"
+                                else -> "Gemce"
+                            },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 },
                 actions = {
                     Surface(
