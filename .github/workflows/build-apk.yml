@@ -35,19 +35,23 @@ jobs:
       - name: Prepare APK Release Artifacts
         run: |
           mkdir -p release-artifacts
-          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/Gemce-v0.2.0.apk
+          VERSION_NAME="${{ github.ref_name }}"
+          if [ -z "$VERSION_NAME" ] || [ "$VERSION_NAME" = "main" ]; then
+            VERSION_NAME="latest"
+          fi
+          cp app/build/outputs/apk/debug/app-debug.apk "release-artifacts/Gemce-${VERSION_NAME}.apk"
 
       - name: Upload APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Gemce-APK
-          path: release-artifacts/Gemce-v0.2.0.apk
+          path: release-artifacts/*.apk
 
       - name: Publish GitHub Release (on version tag)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: release-artifacts/Gemce-v0.2.0.apk
+          files: release-artifacts/*.apk
           name: Gemce ${{ github.ref_name }}
           draft: false
           prerelease: false
