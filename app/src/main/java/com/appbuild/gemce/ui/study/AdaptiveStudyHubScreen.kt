@@ -243,7 +243,7 @@ fun AdaptiveStudyHubScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Tell Gemce what you want to learn today. We'll diagnose the best study technique tailored to your learning goal and track (${studentProfile.getBadgeText()}).",
+                        text = "Tell Gemce what you want to learn today. We'll diagnose the best study technique tailored to your learning goal across any subject or imported notes.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

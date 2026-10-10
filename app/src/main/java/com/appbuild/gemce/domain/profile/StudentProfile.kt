@@ -12,10 +12,10 @@ enum class AcademicLevel(val displayName: String, val shortLabel: String) {
 
 object AcademicOptions {
     val seniorHighStrands = listOf(
-        "STEM (Science, Technology, Engineering & Math)",
-        "ABM (Accountancy, Business & Management)",
-        "HUMSS (Humanities & Social Sciences)",
         "GAS (General Academic Strand)",
+        "HUMSS (Humanities & Social Sciences)",
+        "ABM (Accountancy, Business & Management)",
+        "STEM (Science, Technology, Engineering & Math)",
         "TVL - ICT (Information & Comm. Technology)",
         "TVL - Home Economics",
         "TVL - Industrial Arts / Agri-Fishery",
@@ -24,16 +24,15 @@ object AcademicOptions {
     )
 
     val commonCollegeCourses = listOf(
-        "BS Computer Science / IT / IS",
-        "BS Nursing / Health Sciences",
-        "BS Medical Technology / Pharmacy",
+        "General Education / Liberal Arts",
         "BS Accountancy / Management Accounting",
-        "BS Business Administration / Marketing",
-        "BS Civil / Mechanical / Electrical Eng.",
-        "BS Psychology / Behavioral Sciences",
-        "BS Biology / Chemistry / Physics",
         "Bachelor of Secondary Education",
+        "BS Nursing / Health Sciences",
+        "BS Computer Science / IT / IS",
+        "BS Psychology / Behavioral Sciences",
         "BA Communication / Journalism",
+        "BS Civil / Mechanical / Electrical Eng.",
+        "BS Biology / Chemistry / Physics",
         "BS Criminology / Law Enforcement",
         "Custom / Other Degree"
     )
