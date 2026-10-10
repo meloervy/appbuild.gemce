@@ -71,7 +71,7 @@ Students import their own syllabus, lecture slides, textbooks, or handwritten re
 | **M14** | **Manual Card Creation** | ✅ Completed | Direct card creation (+ Add Card) for studying with zero AI dependency. |
 | **M15** | **Anki Export** | ✅ Completed | One-tap Anki-compatible TSV/CSV deck export with tags, clipboard copy, and Android share sheet. |
 | **M16** | **Interactive Test** | ✅ Completed | Short-answer tests evaluated against reference rubrics with AI scoring, student overrides ("I was right"), and weak topic analysis. |
-| **M17** | **Ask Gemce (Q&A)** | ✅ Completed | Multi-session chat history, note retrieval with `[S1]` citations, topic-agnostic tutoring (System Design, STEM, etc.), and native Markdown formatting. |
+| **M17** | **Ask Gemce (Q&A)** | ✅ Completed | Multi-session chat history, note retrieval with `[S1]` citations, universal academic tutoring across all disciplines (Discrete Math, Life & Works of Rizal, Emerging Technologies, Humanities, Sciences, and user notes), and native Markdown formatting. |
 
 ---
 
